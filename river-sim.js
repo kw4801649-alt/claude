@@ -296,21 +296,28 @@
   }
 
   // ---------- Rain ----------
+  // Each drop is given a fixed landing point up front (rather than always
+  // falling to the bottom of the canvas) so it can splash wherever it
+  // actually lands, and only when that point is on the water.
   const raindrops = [];
   function updateRain(dt) {
     if (!rainCheck.checked) return;
     const toSpawn = Math.round(dt * 90);
     for (let i = 0; i < toSpawn; i++) {
+      const x = Math.random() * W;
+      const landY = Math.random() * H;
       raindrops.push({
-        x: Math.random() * W,
-        y: -5,
+        x,
+        landY,
+        y: landY - (30 + Math.random() * 40),
         speed: 400 + Math.random() * 200,
       });
     }
     for (let i = raindrops.length - 1; i >= 0; i--) {
       const d = raindrops[i];
       d.y += d.speed * dt;
-      if (d.y > H) {
+      if (d.y >= d.landY) {
+        if (inChannel(d.x, d.landY)) spawnRipple(d.x, d.landY);
         raindrops.splice(i, 1);
         continue;
       }
@@ -320,6 +327,49 @@
       ctx.moveTo(d.x, d.y);
       ctx.lineTo(d.x - 2, d.y - 10);
       ctx.stroke();
+    }
+  }
+
+  // ---------- Ripples (rain hitting the water) ----------
+  const ripples = [];
+  function spawnRipple(x, y) {
+    ripples.push({
+      x,
+      y,
+      start: performance.now(),
+      duration: 650 + Math.random() * 350,
+      maxRadius: 12 + Math.random() * 8,
+    });
+  }
+
+  function drawRipples(now) {
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      const rp = ripples[i];
+      const t = (now - rp.start) / rp.duration;
+      if (t >= 1) {
+        ripples.splice(i, 1);
+        continue;
+      }
+      // Two staggered rings per splash for a richer, more organic ripple.
+      for (const delay of [0, 0.25]) {
+        const rt = t - delay;
+        if (rt <= 0) continue;
+        const rNorm = Math.min(1, rt / (1 - delay));
+        const radius = rNorm * rp.maxRadius;
+        const alpha = (1 - rNorm) * 0.55;
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(225,242,255,${alpha.toFixed(2)})`;
+        ctx.lineWidth = 1.3 * (1 - rNorm) + 0.3;
+        ctx.arc(rp.x, rp.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // Tiny bright flash right at impact.
+      if (t < 0.15) {
+        ctx.fillStyle = `rgba(255,255,255,${(0.5 * (1 - t / 0.15)).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(rp.x, rp.y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
@@ -402,6 +452,7 @@
       }
     }
 
+    drawRipples(now);
     updateRain(dt);
 
     // FPS
