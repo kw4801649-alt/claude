@@ -66,13 +66,14 @@ sizes = {}
 
 
 # printed widths in the compact layout (inches): half-width figures, and a few full-width ones
-DISPLAY = 2.45
-DISPLAY_FULL = 4.8
+DISPLAY = 3.0
+DISPLAY_FULL = 5.2
 FULL_NAMES = {"f_terminal", "f_fbd", "f_thirdlaw", "f_stokes"}
-FONT_BOOST = 1.22   # labels stay readable (about 7 pt) at the small printed size
-LINE_BOOST = 1.25
-BOOST_OVERRIDE = {"f_concept": 1.0, "f_threegraphs": 1.0, "f_throwup": 1.0, "f_boat": 1.0, "f_chord": 1.1,
-                  "f_motiondiag": 1.1}
+DISPLAY_W = {"f_concept": 6.4, "f_boat": 5.6}       # per-figure printed widths, for the busiest figures
+SCALE = 0.92         # printed size relative to the size each figure was designed at
+MIN_PT = 9.5         # no label inside a graph prints smaller than this
+LEGEND_MIN_PT = 8.5
+LINE_BOOST = 1.2
 
 
 def save(fig, name, width):
@@ -84,14 +85,16 @@ def save(fig, name, width):
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch, FancyArrowPatch
     from matplotlib.collections import Collection
-    disp = DISPLAY_FULL if name in FULL_NAMES else DISPLAY
+    disp = DISPLAY_W.get(name, min(SCALE * width, 6.2))
     k = disp / width
     fig.set_size_inches(fig.get_size_inches() * k)
-    boost = BOOST_OVERRIDE.get(name, FONT_BOOST)
     legend_texts = {id(t) for ax_ in fig.axes if ax_.get_legend() for t in ax_.get_legend().findobj(Text)}
     for t in fig.findobj(Text):
-        b = min(boost, 1.05) if id(t) in legend_texts else boost
-        t.set_fontsize(t.get_fontsize() * k * b)
+        fs = t.get_fontsize()
+        if not t.get_text().strip():
+            continue
+        floor = LEGEND_MIN_PT if id(t) in legend_texts else MIN_PT + 0.5 * max(fs - 10.0, 0)
+        t.set_fontsize(max(fs * k, floor))
     for l in fig.findobj(Line2D):
         l.set_linewidth(l.get_linewidth() * k * LINE_BOOST)
         l.set_markersize(l.get_markersize() * k * LINE_BOOST)
@@ -301,8 +304,8 @@ def fig_three_graphs():
     ax.text(6.6, 14, "straight line:\nsteady slope", fontsize=8.5, color="0.35", ha="center")
     ax.set_ylabel(r"displacement $s$ (m)")
     ax.set_ylim(-3, 75)
-    for x0, x1, lab in [(0, 4, "A: speeding up\n($a = +2$)"), (4, 8, "B: constant velocity\n($a = 0$)"),
-                        (8, 14, "C: slowing, stopping,\nthen reversing ($a = -2$)")]:
+    for x0, x1, lab in [(0, 4, "A: speeding\nup ($a = +2$)"), (4, 8, "B: constant\nvelocity ($a = 0$)"),
+                        (8, 14, "C: slows, stops,\nreverses ($a = -2$)")]:
         ax.text((x0 + x1) / 2, 77, lab, ha="center", va="bottom", fontsize=8.5, weight="bold")
     ax = axs[1]
     ax.plot(t, v, color="black", lw=1.5)
@@ -586,9 +589,9 @@ def fig_drop_vs_throw():
     ax.plot([], [], "o", color="#c0392b", ms=6, label="dropped from rest")
     ax.plot([], [], "o", color="#2e6fd1", ms=6, label=r"thrown sideways at 6.0 m s$^{-1}$")
     ax.add_patch(Rectangle((-1.0, -0.8), 0.75, 0.55, fc=icons.WOOD, ec=icons.WOOD_DARK, lw=0.6, zorder=3))
-    ax.text(9.3, 5.6, "Same height at every\ninstant: vertical motion\nis not affected by the\nsideways motion",
+    ax.text(9.6, 5.6, "Same height at every\ninstant: vertical motion\nis not affected by the\nsideways motion",
             fontsize=8.5, va="center")
-    ax.set_xlim(-1, 15)
+    ax.set_xlim(-1, 17.5)
     ax.set_ylim(12.4, -0.8)
     ax.set_xlabel(r"horizontal distance $x$ (m)")
     ax.set_ylabel("distance fallen (m)")
@@ -905,18 +908,18 @@ def fig_boat():
     w = 5.2
     fig, ax = plt.subplots(figsize=(w, 3.3))
     ax.set_xlim(-0.2, 10.4)
-    ax.set_ylim(-1.1, 7.4)
+    ax.set_ylim(-1.1, 8.0)
     plain_axes(ax)
     k = 1.2  # drawing units per m/s, the same for every arrow
     x0 = 4.6
-    ax.text(0, 7.2, "UPSTREAM", fontsize=10, weight="bold", va="top")
+    ax.text(0, 7.9, "UPSTREAM", fontsize=10, weight="bold", va="top")
     arrow(ax, x0, 6.3, x0 - 3.0 * k, 6.3, color=BLUE, lw=1.7)
     ax.text(x0 - 1.5 * k, 6.45, r"boat relative to water: $-3.0$ m s$^{-1}$", color=BLUE, ha="center", va="bottom", fontsize=9)
     arrow(ax, x0 - 3.0 * k, 5.55, x0 - 3.0 * k + 1.2 * k, 5.55, color=GREEN, lw=1.7)
     ax.text(x0 - 3.0 * k - 0.1, 5.55, r"water relative to ground: $+1.2$", color=GREEN, ha="right", va="center", fontsize=9)
     arrow(ax, x0, 4.75, x0 - 1.8 * k, 4.75, color="black", lw=1.9)
     ax.text(x0 + 0.15, 4.75, r"boat relative to ground $= -1.8$ m s$^{-1}$ (upstream)", ha="left", va="center", fontsize=9)
-    ax.text(0, 3.75, "DOWNSTREAM", fontsize=10, weight="bold", va="top")
+    ax.text(0, 4.15, "DOWNSTREAM", fontsize=10, weight="bold", va="top")
     arrow(ax, x0, 2.85, x0 + 3.0 * k, 2.85, color=BLUE, lw=1.7)
     ax.text(x0 + 1.5 * k, 3.0, r"boat relative to water: $+3.0$ m s$^{-1}$ (downstream)", color=BLUE, ha="center", va="bottom", fontsize=9)
     arrow(ax, x0 + 3.0 * k, 2.1, x0 + 4.2 * k, 2.1, color=GREEN, lw=1.7)

@@ -287,6 +287,13 @@ def text_room(start, need_pt, skip=()):
     return have >= need_pt
 
 
+def native_width(fig_p):
+    """Figures are saved at 400 dpi at their printed size, so the pixel width gives the width."""
+    d = fig_p.find(".//" + w("drawing"))
+    target = RELS[d.find(f".//{{{A}}}blip").get(f"{{{R}}}embed")]
+    return Image.open(f"{UN}/word/{target}").size[0] / 400
+
+
 def prep_parts(fig_p, cap_p, win):
     d = fig_p.find(".//" + w("drawing"))
     target = RELS[d.find(f".//{{{A}}}blip").get(f"{{{R}}}embed")]
@@ -438,13 +445,14 @@ for fp in figs:
     cp = fp.getnext()
     name = fp.find(f".//{{{WP}}}docPr").get("name")
     target = RELS[fp.find(f".//{{{A}}}blip").get(f"{{{R}}}embed")]
-    if name == "f_terminal" or target.split("/")[-1] in {"f_fbd.png", "f_thirdlaw.png", "f_stokes.png"}:
-        prep_parts(fp, cp, FULL_IN)
+    if native_width(fp) > 5.05:
+        prep_parts(fp, cp, native_width(fp))
         spacing(fp, before=40, after=20)
         spacing(cp, before=0, after=100)
         stats["full"] += 1
         continue
-    h_pt, _ = prep_parts(fp, cp, FLOAT_IN)
+    win = native_width(fp)
+    h_pt, _ = prep_parts(fp, cp, win)
     need = h_pt + (len(text_of(cp)) // CHARS_CAPTION + 1) * PT_LINE + 10
     prev, nxt = fp.getprevious(), cp.getnext()
     anchor = None
@@ -456,7 +464,7 @@ for fp in figs:
     fp.find(f"{w('pPr')}/{w('jc')}").set(w("val"), "center")
     spacing(cp, before=0, after=0)
     cp.find(f"{w('pPr')}/{w('jc')}").set(w("val"), "both")
-    wd = int(FLOAT_IN * 1440) + 60
+    wd = int(win * 1440) + 60
     if DEBUG:
         def why(start, skip=()):
             out = []; e = start; have = 0
@@ -481,7 +489,7 @@ for fp in figs:
         tc.append(cp)
         anchor.addprevious(tbl)
         stats["float"] += 1
-    elif beside_text(fp, cp, h_pt, wd):
+    elif win <= 4.3 and beside_text(fp, cp, h_pt, wd):
         stats["beside"] = stats.get("beside", 0) + 1
     else:
         # side caption: figure on the left, caption beside it
