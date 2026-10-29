@@ -1,0 +1,170 @@
+# Chapter 2 · Forces and Momentum
+[BOX WHAT THIS TOPIC IS ABOUT] Kinematics described motion without asking why it happens. This topic gives the reason: **forces**. A force changes the velocity of an object, and the rule that links the two is Newton’s second law. The same idea, written in terms of **momentum**, explains collisions, explosions, impacts and even why things move in circles.
+## 2.1 Forces and Newton’s first law
+A **force** is a push or a pull that one object exerts on another. Every force is an **interaction** between two objects: something pushes or pulls *on* something else. Force is a vector, so it has a size and a direction, and its SI unit is the **newton** (N). One newton is the force that gives a 1 kg mass an acceleration of 1 m s^{−2}.
+Usually several forces act on an object at once. What matters is their vector sum, called the **resultant force** (or net force). If the forces cancel out, the resultant force is zero.
+Newton’s first law says what happens when the resultant force is zero:
+[BOX KEY IDEA] **Newton’s first law.** An object stays at rest, or keeps moving at a constant velocity (constant speed in a straight line), unless a resultant force acts on it.
+This was a revolutionary idea. Everyday experience suggests that things stop unless you keep pushing them, but that is only because friction and drag are always acting. In space, a moving probe keeps going for ever with its engines switched off.
+The tendency of an object to keep doing what it is already doing is called **inertia**. The more mass an object has, the more inertia it has: it is harder to start it moving, stop it or turn it.
+An object with zero resultant force is in **equilibrium**. There are two kinds:
+- **Static equilibrium**: at rest, for example a book on a table.
+- **Dynamic equilibrium**: moving at constant velocity, for example a car cruising at a steady 25 m s^{−1} on a straight road, or a skydiver at terminal speed.
+[BOX WATCH OUT] “Constant velocity” needs **no** resultant force. A car cruising at a steady speed still needs its engine, but only to balance drag and friction: the driving force equals the resistive forces, so the resultant is zero. A resultant force is needed only to *change* the velocity.
+## 2.2 Free-body diagrams
+A **free-body diagram** shows one object on its own, with an arrow for every force that acts **on** it. It is the most important tool in this topic: almost every force problem starts with one.
+### The method for any free-body diagram
+1. Draw the object on its own, as a box or a dot. Do not draw the things around it.
+2. Add the weight, acting downwards from the centre of mass.
+3. Go round the object: wherever it touches something (a surface, a rope, a fluid), add the force that thing exerts on it.
+4. Label every arrow with its name or symbol, and make the lengths roughly match the sizes of the forces.
+5. Check: only forces **on** this object, and every force has a cause you can name.
+[FIG f_fbd] Free-body diagrams drawn to scale. (a) A 1.5 kg book resting on a table: the normal force balances the weight. (b) A 1.0 kg mass hanging from a string: the tension balances the weight. (c) A 1200 kg car accelerating: the road pushes the drive wheels forwards with 3.0 kN, drag is 1.0 kN, so the resultant is 2.0 kN forwards.
+[BOX EXAM TIP] Never draw “the force of motion” or “the acceleration” on a free-body diagram. A moving object does not carry a force with it. Only draw forces that something else exerts on the object: weight, normal force, tension, friction, drag, buoyancy, thrust.
+## 2.3 The forces you need to know
+### Weight
+The **weight** of an object is the gravitational force that the Earth exerts on it. Near the Earth’s surface it is
+$$ F_{g}=mg $$ (2.1)
+where $m$ is the mass and $g=9.81\ \text{N kg}^{-1}$ is the **gravitational field strength**. This is the same number as the free-fall acceleration in Chapter 1 (1 N kg^{−1} = 1 m s^{−2}).
+[BOX WATCH OUT] Mass and weight are different. **Mass** (kg) is the amount of matter and does not change from place to place. **Weight** (N) is a force and depends on where you are: a 60 kg astronaut weighs 589 N on Earth but only 97 N on the Moon, where $g=1.62\ \text{N kg}^{-1}$.
+### Normal force and tension
+When an object presses on a surface, the surface pushes back, at right angles to itself. This is the **normal force** $F_{N}$ (“normal” means perpendicular). The surface deforms very slightly, like a stiff spring, and pushes back just hard enough to stop the object sinking in. The normal force is *not* always equal to the weight: it is smaller on a slope, and it changes in an accelerating lift (Section 2.4).
+A taut string, rope or cable pulls on the objects at each end. This pull is the **tension** $T$. It always acts along the string, away from the object. For a light string over a smooth pulley, the tension is the same all the way along.
+### Friction
+**Friction** acts where two surfaces touch, parallel to the surfaces, and opposes their sliding over each other. There are two kinds:
+- **Static friction** acts when the surfaces are not sliding. It is only as large as it needs to be to stop sliding, up to a maximum value.
+- **Dynamic (kinetic) friction** acts when the surfaces are sliding. It is roughly constant and usually a little smaller than the maximum static friction.
+$$ F_{f}\le\mu_{s}F_{N} $$ (2.2)
+$$ F_{f}=\mu_{d}F_{N} $$ (2.3)
+Here $\mu_{s}$ and $\mu_{d}$ are the **coefficients of static and dynamic friction**. They have no units and depend on the two surfaces (rubber on dry tarmac is about 0.8; steel on ice is about 0.03). Notice that friction depends on how hard the surfaces are pressed together ($F_{N}$), not on the area of contact.
+[FIG f_friction] Force-sensor reading for a 2.0 kg block pulled with a slowly increasing force (simulated data). While the block is still, static friction exactly matches the pull and rises with it. At the limit, $\mu_{s}F_{N}=8.8$ N, the block starts to slide and the friction drops to the dynamic value, $\mu_{d}F_{N}\approx5.9$ N, with small stick–slip fluctuations.
+[BOX WATCH OUT] $F_{f}=\mu_{s}F_{N}$ is the *maximum* static friction, not the actual friction. A box resting on a level floor with nobody pushing it has **zero** friction on it. If you push it gently with 20 N and it does not move, the static friction is exactly 20 N.
+### Elastic restoring force (Hooke’s law)
+A stretched or compressed spring pulls or pushes back towards its natural length. For many springs, the force is proportional to the extension $x$ (the change in length):
+$$ F_{H}=-kx $$ (2.4)
+The **spring constant** $k$ (N m^{−1}) measures stiffness: a stiff spring has a large $k$. The minus sign shows that the force is opposite to the displacement: stretch the spring and it pulls back. Hooke’s law only works up to the **limit of proportionality**; beyond it the graph curves.
+[FIG f_hooke] Force against extension for a spring (simulated measurements with small random errors). The straight part obeys Hooke’s law; its gradient is the spring constant, here about 25 N m^{−1}. Above about 4.5 N the spring passes its limit of proportionality and stretches more than Hooke’s law predicts.
+### Drag and buoyancy in a fluid
+An object moving through a fluid feels a **drag force** opposite to its velocity (Section 1.10). For a small sphere moving slowly through a viscous fluid, the drag is given by **Stokes’ law**:
+$$ F_{d}=6\pi\eta rv $$ (2.5)
+where $\eta$ is the **viscosity** of the fluid (Pa s), $r$ is the radius of the sphere and $v$ is its speed. Stokes’ law applies only to smooth spheres moving slowly, with a smooth (non-turbulent) flow of fluid around them.
+Any object in a fluid also feels an upward **buoyancy force** (upthrust), equal to the weight of the fluid it pushes aside (**Archimedes’ principle**):
+$$ F_{b}=\rho Vg $$ (2.6)
+where $\rho$ is the density of the *fluid* and $V$ is the volume of fluid displaced. An object floats when the buoyancy can balance its weight before it is completely submerged.
+[FIG f_stokes] Left: forces on a steel ball bearing falling at its terminal speed in glycerol, drawn to scale. Right: position–time data for ball bearings of three sizes (simulated video measurements). Each graph is a straight line, so each ball falls at a constant terminal speed; doubling the radius makes the terminal speed four times larger, as Stokes’ law predicts.
+At terminal speed the forces balance: $mg=F_{b}+F_{d}$. Putting in Stokes’ law gives a terminal speed that grows with $r^{2}$, which is why fine sand and mud take so long to settle in water.
+[TABLE 2300,3200,4138]
+| Force | Equation | Direction |
+| Weight | $F_{g}=mg$ | towards the centre of the Earth (down) |
+| Normal force | (found from the other forces) | perpendicular to the surface, away from it |
+| Tension | (found from the other forces) | along the string, away from the object |
+| Static friction | $F_{f}\le\mu_{s}F_{N}$ | along the surface, opposing the sliding that would happen |
+| Dynamic friction | $F_{f}=\mu_{d}F_{N}$ | along the surface, opposing the sliding |
+| Elastic (spring) | $F_{H}=-kx$ | towards the natural length |
+| Viscous drag | $F_{d}=6\pi\eta rv$ | opposite to the velocity |
+| Buoyancy | $F_{b}=\rho Vg$ | upwards |
+## 2.4 Newton’s second law
+When the resultant force on an object is **not** zero, the object accelerates in the direction of the resultant force. The acceleration is proportional to the resultant force and inversely proportional to the mass:
+$$ F=ma $$ (2.7)
+Here $F$ is the **resultant** force (the vector sum of all the forces), not any single force. Double the resultant force and the acceleration doubles; double the mass and the acceleration halves.
+### The method for any $F=ma$ problem
+1. Draw a free-body diagram of one object.
+2. Choose a positive direction, usually the direction of the acceleration.
+3. Write the resultant force as (forces in the positive direction) minus (forces in the negative direction).
+4. Set the resultant equal to $ma$ and solve. If you then need a velocity, distance or time, use the SUVAT equations from Chapter 1.
+For the car in Figure 2.1(c): resultant force $F=3.0\ \text{kN}-1.0\ \text{kN}=2.0\ \text{kN}$, so $a=\frac{F}{m}=\frac{2000}{1200}=1.7\ \text{m s}^{-2}$.
+### Apparent weight in a lift
+Bathroom scales measure the normal force, not your weight. In a lift that accelerates upwards, the floor must push up harder than your weight to give you the upward acceleration. Taking up as positive, $F_{N}-mg=ma$, so
+$$ F_{N}=m(g+a) $$ (2.8)
+The scale reads more than your weight when the acceleration is upwards (speeding up on the way up, or slowing down on the way down), less when it is downwards, and exactly your weight when the lift moves at constant velocity. In free fall $a=-g$ and the scale reads zero: this is “weightlessness”.
+[FIG f_lift] Scale reading for a 60 kg person in a lift that starts from rest, rises at constant speed and stops (simulated data, including small vibrations). The reading is 649 N while the lift speeds up at 1.0 m s^{−2}, 589 N (the true weight) at constant velocity, and 529 N while it slows down.
+### Connected objects
+When objects are joined by a string, or one pushes another, they share the same acceleration. You can find it by treating them as **one** object (total mass, external forces only), then draw a separate free-body diagram for one part to find the force between them.
+[BOX WATCH OUT] $F=ma$ uses the *resultant* force. A common mistake is to put the driving force or the tension in place of $F$ and forget the friction or the weight acting the other way. Draw the free-body diagram first, every time.
+## 2.5 Forces at an angle and on slopes
+A force at an angle can be replaced by two perpendicular components, exactly as for velocities in Section 1.8. Choose directions that make the problem easy: usually along and perpendicular to the motion.
+On a slope at angle $\theta$ to the horizontal, resolve the weight **along** and **perpendicular to** the slope:
+$$ F_{\parallel}=mg\sin\theta $$ (2.9)
+$$ F_{\perp}=mg\cos\theta $$ (2.10)
+The block does not move into the slope, so the normal force balances the perpendicular component: $F_{N}=mg\cos\theta$. The component $mg\sin\theta$ pulls the block down the slope; if the block stays still, static friction balances it.
+[FIG f_incline] A 4.0 kg block at rest on a slope of 25°, drawn to scale. The weight (39 N) is resolved into 16.6 N down the slope and 35.6 N into the slope. The normal force balances the perpendicular part; static friction (16.6 N up the slope) balances the parallel part.
+The block is just about to slip when the friction needed equals its maximum value, $mg\sin\theta=\mu_{s}mg\cos\theta$. The mass cancels, leaving
+$$ \tan\theta=\mu_{s} $$ (2.11)
+So you can measure $\mu_{s}$ by slowly tilting a slope and recording the angle at which the block starts to slide. For the block in Figure 2.6 to stay at rest, $\mu_{s}$ must be at least $\tan25^{\circ}=0.47$.
+[BOX EXAM TIP] On a slope, the angle between the weight and the perpendicular to the slope is the same as the slope angle $\theta$. A quick check: when $\theta=0$ (flat ground) the component along the slope, $mg\sin\theta$, must be zero, and the component into the slope, $mg\cos\theta$, must be the whole weight.
+## 2.6 Newton’s third law
+[BOX KEY IDEA] **Newton’s third law.** When object A exerts a force on object B, object B exerts a force on object A that is equal in size and opposite in direction.
+The two forces in a third-law pair always:
+- act on **different** objects (one on A, one on B);
+- are the **same type** of force (both gravitational, both contact, both friction, and so on);
+- have **equal size** and **opposite direction**, and act along the same line;
+- exist at the same time: you cannot have one without the other.
+[FIG f_thirdlaw] Newton’s third-law pairs. (a) Two skaters push apart: each feels an equal and opposite force, but the lighter one accelerates more. (b) A book on a table, shown pulled apart for clarity. The weight of the book and the normal force on it act on the **same** object, so they are **not** a third-law pair. Each has its own partner: the book pulls the Earth up, and the book pushes down on the table.
+[BOX WATCH OUT] The weight of a book and the normal force on it are equal and opposite, but this is because of Newton’s **first** law (the book is in equilibrium), not the third. They act on the same object and are different types of force. If the table were in an accelerating lift they would not even be equal.
+If the forces are equal and opposite, why does anything move? Because the two forces act on different objects, so they never cancel each other. When you walk, you push backwards on the ground with friction, and the ground pushes you forwards with an equal force. The Earth’s huge mass means its acceleration is far too small to notice.
+## 2.7 Momentum
+The **linear momentum** of an object is its mass multiplied by its velocity:
+$$ p=mv $$ (2.12)
+Momentum is a vector, in the same direction as the velocity, with units kg m s^{−1} (which are the same as N s). It measures how hard it is to stop a moving object: a slow lorry and a fast bullet can both have a lot of momentum.
+Newton’s second law can be written in terms of momentum. The resultant force equals the rate of change of momentum:
+$$ F=\frac{\Delta p}{\Delta t} $$ (2.13)
+If the mass is constant, $\Delta p=m\Delta v$, and this becomes $F=m\frac{\Delta v}{\Delta t}=ma$: the same law as before. The momentum form is more general, because it also works when the mass changes, for example a rocket burning fuel or sand falling onto a conveyor belt.
+The kinetic energy of an object can also be written in terms of its momentum. Since $E_{k}=\frac{1}{2}mv^{2}$ and $v=\frac{p}{m}$,
+$$ E_{k}=\frac{p^{2}}{2m} $$ (2.14)
+[BOX IN PLAIN ENGLISH] Force is how quickly momentum changes. A large force changes momentum quickly; a small force needs a long time to make the same change.
+## 2.8 Impulse and force–time graphs
+Rearranging Eq. 2.13 gives the **impulse** $J$, the product of the force and the time for which it acts. The impulse equals the change in momentum it produces:
+$$ J=F\Delta t=\Delta p $$ (2.15)
+Impulse has the units N s. In real impacts the force is not constant: it rises from zero to a peak and falls again. The impulse is then the **area under the force–time graph**, and $F$ in Eq. 2.15 is the average force.
+[FIG f_kick] Force on a football during a kick, as a force sensor would record it (simulated data, sampled 10 000 times a second). The contact lasts about 9 ms and the force peaks at about 2.5 kN. The shaded area is the impulse, 11.2 N s, which sends the 0.43 kg ball off at 26 m s^{−1}. The dashed rectangle shows the average force: same area, same impulse.
+For a given change in momentum, the impulse is fixed. Making the collision last longer therefore makes the average force smaller. This is how many safety features work:
+- **Airbags, seatbelts and crumple zones** stretch out the time a passenger takes to stop.
+- **Bending your knees** when you land from a jump makes the stopping time longer.
+- **Helmets** and **gym mats** contain soft material that squashes slowly.
+[FIG f_airbag] The same impulse delivered in two ways (computer model). A 5.0 kg head moving at 14 m s^{−1} (50 km h^{−1}) is brought to rest, so the impulse is 70 N s in both cases. Hitting a rigid dashboard takes about 5 ms and the force peaks at about 26 kN. An airbag stretches the stop to about 60 ms, and the peak force falls to about 2 kN.
+[BOX WATCH OUT] Safety features do **not** reduce the change in momentum or the impulse: the person still stops from the same speed. They reduce the **force** by making the time longer.
+## 2.9 Conservation of momentum: collisions and explosions
+When two objects collide, Newton’s third law says they exert equal and opposite forces on each other, for exactly the same time. So they receive equal and opposite impulses: whatever momentum one gains, the other loses. This gives one of the most important laws in physics:
+[BOX KEY IDEA] **Conservation of momentum.** In a system on which no external resultant force acts, the total momentum stays constant.
+For two objects that collide,
+$$ m_{1}u_{1}+m_{2}u_{2}=m_{1}v_{1}+m_{2}v_{2} $$ (2.16)
+where $u$ means a velocity before the collision and $v$ a velocity after it. Velocities are vectors, so choose a positive direction and give velocities in the other direction a minus sign.
+[FIG f_trolleys] Motion-sensor data for two 0.50 kg trolleys (simulated). Trolley A rolls at 0.60 m s^{−1} into trolley B, which is at rest; they stick together and move off at 0.30 m s^{−1}. Bottom: A loses exactly the momentum that B gains, so the total momentum (0.30 kg m s^{−1}) stays the same through the collision. It falls slowly afterwards only because friction, an external force, acts on the trolleys.
+### Elastic and inelastic collisions
+Momentum is always conserved in a collision (if there is no external force). Kinetic energy usually is not: some of it is changed into thermal energy, sound and the work done in permanently bending things.
+[TABLE 2600,3400,3638]
+| Type of collision | Momentum | Kinetic energy |
+| Elastic | conserved | conserved (no kinetic energy is lost) |
+| Inelastic | conserved | not conserved (some is changed into other forms) |
+| Totally inelastic | conserved | the objects stick together: the largest possible loss |
+| Explosion | conserved (often zero before) | increases (comes from stored chemical or elastic energy) |
+In the trolley collision of Figure 2.10, the kinetic energy before is $\frac{1}{2}\times0.50\times0.60^{2}=0.090$ J and after it is $\frac{1}{2}\times1.0\times0.30^{2}=0.045$ J. Half of the kinetic energy has been changed into other forms, so the collision is totally inelastic, even though momentum is perfectly conserved.
+### Explosions
+In an **explosion** the objects start together, often at rest, so the total momentum is zero before. It must still be zero after: the pieces fly apart with equal and opposite momenta. The kinetic energy comes from a store of energy such as a compressed spring or a chemical reaction. The recoil of a gun and the thrust of a rocket work the same way.
+[FIG f_explosion] Two trolleys at rest are pushed apart by a compressed spring. Afterwards the 1.0 kg trolley moves left at 0.40 m s^{−1} and the 2.0 kg trolley moves right at 0.20 m s^{−1}. Their momenta are equal and opposite ($\mp0.40$ kg m s^{−1}), so the total stays zero.
+[BOX EXAM TIP] In any collision question, write “total momentum before = total momentum after”, put in the numbers with signs, and solve. Only then think about kinetic energy, which you need if the question asks whether the collision is elastic. Remember that $E_{k}=\frac{p^{2}}{2m}$ means that, for the same momentum, the lighter object always has more kinetic energy.
+## 2.10 Circular motion
+An object moving in a circle at constant speed is **accelerating**, because the direction of its velocity keeps changing. To describe this motion we use:
+- the **period** $T$: the time for one complete circle;
+- the **frequency** $f$: the number of circles per second, $f=\frac{1}{T}$;
+- the **angular velocity** $\omega$: the angle swept out per second, in radians per second (rad s^{−1}).
+In one period the object travels a distance $2\pi r$ and sweeps out an angle of $2\pi$ radians, so
+$$ v=\frac{2\pi r}{T}=\omega r $$ (2.17)
+$$ \omega=\frac{2\pi}{T}=2\pi f $$ (2.18)
+The velocity is always along the tangent to the circle. The acceleration points towards the **centre** of the circle and is called the **centripetal acceleration**:
+$$ a=\frac{v^{2}}{r}=\omega^{2}r=\frac{4\pi^{2}r}{T^{2}} $$ (2.19)
+[FIG f_circle] An object moving anticlockwise round a circle at constant speed. The velocity (blue) is always tangent to the circle; the acceleration (red) always points to the centre. Inset: in a short time the velocity changes by $\Delta\mathbf{v}$, which also points towards the centre.
+By Newton’s second law, a centripetal acceleration needs a resultant force towards the centre, the **centripetal force**:
+$$ F=\frac{mv^{2}}{r}=m\omega^{2}r $$ (2.20)
+The centripetal force is not a new kind of force. It is the name for the resultant force towards the centre, and it is always provided by one or more of the real forces from Section 2.3.
+[TABLE 3200,6438]
+| Situation | What provides the centripetal force |
+| Ball whirled on a string | tension in the string |
+| Car going round a level bend | friction between the tyres and the road |
+| Moon orbiting the Earth | gravitational force of the Earth on the Moon |
+| Conical pendulum | horizontal component of the tension |
+| Passenger at the top of a loop-the-loop | weight plus the normal force from the seat (both downwards) |
+[FIG f_conical] A conical pendulum drawn to scale: a 0.20 kg bob on a 0.80 m string moving in a horizontal circle with the string at 30° to the vertical. The vertical component of the tension balances the weight; the horizontal component (1.13 N) is the centripetal force, which gives a speed of 1.50 m s^{−1} and a period of 1.67 s.
+For the conical pendulum, $T\cos\theta=mg$ vertically and $T\sin\theta=\frac{mv^{2}}{r}$ horizontally. Dividing one by the other gives $\tan\theta=\frac{v^{2}}{rg}$: the faster the bob goes, the further out the string swings.
+[BOX WATCH OUT] There is no outward “centrifugal force” acting on an object moving in a circle. If you feel pushed outwards in a turning car, it is your body trying to keep going in a straight line (Newton’s first law) while the car turns underneath you. On a free-body diagram, the resultant force points **inwards**, towards the centre.
+[BOX EXAM TIP] Circular motion questions: (1) draw the free-body diagram; (2) find the resultant force towards the centre; (3) set it equal to $\frac{mv^{2}}{r}$. Convert any period or frequency into $v$ or $\omega$ first, and remember that $r$ is the radius of the circle, which for a conical pendulum is $L\sin\theta$, not the string length $L$.

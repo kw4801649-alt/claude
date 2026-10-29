@@ -128,8 +128,7 @@ info = figinfo["info"]
 # ---------------------------------------------------------------- figures
 ORDER = ["f_concept", "f_walk", "f_chord", "f_motiondiag", "f_threegraphs", "f_suvatarea", "f_throwup",
          "f_components", "f_dropthrow", "f_projvectors", "f_angles", "f_cliffgeneral", "f_forces",
-         "f_terminal", "f_dragproj", "f_ggraph", "f_boat", "f_ex3", "f_ex5", "f_ex6", "f_ex8", "f_ex9",
-         "f_ex13", "f_ex15", "f_ex16"]
+         "f_terminal", "f_dragproj", "f_ggraph", "f_boat"]
 
 
 def set_extent(drawing, name):
@@ -234,6 +233,9 @@ NAVY = "1F2F7A"
 # 1. callout boxes and data tables
 for tbl in body.iter(w("tbl")):
     tp = tbl.find(w("tblPr"))
+    cap = tp.find(w("tblCaption"))
+    if cap is not None and cap.get(w("val")) == "equation":
+        continue
     ncol = len(tbl.find(w("tblGrid")))
     first = text_of(tbl.find(".//" + w("tc")))
     borders = tp.find(w("tblBorders"))

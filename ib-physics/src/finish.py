@@ -66,7 +66,7 @@ TAB_RUN = f'<w:r>{RPR}<w:tab/></w:r>'
 odd = f'{XML}{open_tag}<w:p>{PPR}{styleref("Heading 2", "A.1 Kinematics")}{TAB_RUN}{page_field()}</w:p></w:hdr>'
 # even (left-hand) pages: page number on the left, guide title on the right
 even = (f'{XML}{open_tag}<w:p>{PPR}{page_field()}{TAB_RUN}'
-        f'<w:r>{RPR}<w:t xml:space="preserve">IB Physics SL.  A.1 Kinematics: study guide</w:t></w:r></w:p></w:hdr>')
+        f'<w:r>{RPR}<w:t xml:space="preserve">IB Physics SL.  Kinematics, forces and momentum</w:t></w:r></w:p></w:hdr>')
 first = f'{XML}{open_tag}<w:p>{PPR}</w:p></w:hdr>'
 (UN / "word/header1.xml").write_text(odd, encoding="utf8")
 (UN / "word/header2.xml").write_text(even, encoding="utf8")
