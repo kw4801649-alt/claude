@@ -38,10 +38,10 @@ HEAD_NS = (UN / "word/header1.xml").read_text(encoding="utf8")
 open_tag = re.match(r'(<\?xml[^>]*\?>)?\s*(<w:hdr[^>]*>)', HEAD_NS).group(2)
 XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 RPR = (f'<w:rPr><w:rFonts w:ascii="{FONT}" w:hAnsi="{FONT}" w:cs="{FONT}" w:eastAsia="{FONT}"/>'
-       '<w:i/><w:iCs/><w:caps/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr>')
+       '<w:i/><w:iCs/><w:caps/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr>')
 RPR_NUM = (f'<w:rPr><w:rFonts w:ascii="{FONT}" w:hAnsi="{FONT}" w:cs="{FONT}" w:eastAsia="{FONT}"/>'
-           '<w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr>')
-TABS = '<w:tabs><w:tab w:val="right" w:pos="9638"/></w:tabs>'
+           '<w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr>')
+TABS = '<w:tabs><w:tab w:val="right" w:pos="10466"/></w:tabs>'
 PPR = f'<w:pPr>{TABS}<w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>'
 
 

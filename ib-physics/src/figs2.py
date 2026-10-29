@@ -15,6 +15,7 @@ from figs import plt, arrow, dimline, plain_axes, smoothstep, save, sizes, G
 from figs import BLUE, RED, GREEN, ORANGE, GREY, EARTH, EARTHFILL
 
 OUT = sys.argv[1]
+import icons
 PURPLE = "#6a3d9a"
 
 
@@ -115,6 +116,8 @@ def fig_friction():
     ax.set_ylim(0, 11.5)
     ax.set_xlabel(r"time $t$ (s)")
     ax.set_ylabel(r"friction force $F_f$ (N)")
+    ia = icons.inset(ax, [0.55, 0.06, 0.43, 0.3], (-1.7, 1.9), (-0.35, 0.6))
+    icons.force_sensor_setup(ia, 0, 0, 1.0)
     save(fig, "f_friction", w)
 
 
@@ -158,8 +161,8 @@ def fig_stokes():
     B = rho_f * V * G
     D = W - B
     k = 1.6 / W
-    ax.add_patch(Rectangle((-1.3, -2.2), 2.6, 4.4, fc="#f3ecd2", ec="0.6", lw=0.6))
-    ax.text(-1.2, 2.05, "glycerol", fontsize=8.5, va="top", color="0.35")
+    icons.measuring_cylinder(ax, 0, -2.2, w=1.9, h=4.4, fill=0.93)
+    ax.text(-0.9, 1.9, "glycerol", fontsize=8.5, va="top", color="0.25", zorder=8)
     ax.add_patch(Circle((0, 0), 0.22, fc="0.55", ec="black", zorder=5))
     force(ax, 0, -0.22, 0, -k * W, RED, f"weight\n{W*1e3:.2f} mN", lx=0.08, ly=0.3, fs=8.5)
     force(ax, -0.1, 0.22, 0, k * B, GREEN, f"buoyancy\n{B*1e3:.2f} mN", lx=-0.08, ly=0.05, ha="right", fs=8.5)
@@ -212,6 +215,8 @@ def fig_lift():
     ax.text(12.0, 497, "slowing down\n(still going up)", ha="center", fontsize=8.5)
     ax.set_xlim(0, 16)
     ax.set_ylim(480, 700)
+    ia = icons.inset(ax, [0.3, 0.03, 0.14, 0.34], (-0.9, 0.9), (-0.05, 3.3))
+    icons.lift_car(ia, 0, 0, 1.0)
     ax.set_xlabel(r"time $t$ (s)")
     ax.set_ylabel(r"scale reading $F_N$ (N)")
     save(fig, "f_lift", w)
@@ -338,6 +343,9 @@ def fig_kick():
     dimline(ax, 0, -150, dur * 1e3, -150)
     ax.text(dur * 1e3 / 2, -190, "contact time 9 ms", ha="center", va="top", fontsize=8.5)
     ax.axhline(0, color="black", lw=0.5)
+    ia = icons.inset(ax, [0.0, 0.45, 0.2, 0.42], (-0.8, 0.9), (-0.1, 1.3))
+    icons.boot(ia, -0.15, 0.1, 0.9)
+    icons.football(ia, 0.55, 0.45, 0.3)
     ax.set_xlim(-2, 14)
     ax.set_ylim(-420, 2850)
     ax.set_xlabel(r"time $t$ (ms)")
@@ -361,6 +369,9 @@ def fig_airbag():
         ax.plot(t * 1e3, F / 1e3, color=c, lw=1.4, label=f"{lab}: $\\Delta t$ = {dur*1e3:.0f} ms, peak {F.max()/1e3:.1f} kN")
         out[lab] = float(F.max())
     ax.text(40, 6.5, "both areas = 70 N s\n(same change of momentum)", fontsize=8.8, ha="center")
+    ia = icons.inset(ax, [0.5, 0.36, 0.22, 0.3], (-0.6, 1.3), (-0.9, 0.8))
+    icons.head(ia, 0, 0, 0.9)
+    icons.airbag(ia, 0.75, 0.05, 0.9)
     ax.set_xlim(-5, 80)
     ax.set_ylim(0, 29)
     ax.set_xlabel(r"time $t$ (ms)")
@@ -404,7 +415,13 @@ def fig_trolleys():
     ax.text(tc + 0.05, 0.66, "collision", fontsize=8.5, color="0.3")
     ax.set_ylabel(r"velocity $v$ (m s$^{-1}$)")
     ax.set_ylim(-0.05, 0.75)
-    ax.legend(loc="center right", fontsize=8.2)
+    ax.legend(loc="upper right", fontsize=8.2)
+    ia = icons.inset(ax, [0.47, 0.06, 0.52, 0.27], (-0.3, 3.3), (-0.05, 0.55))
+    ia.plot([-0.2, 3.2], [0, 0], color="0.3", lw=1.0)
+    icons.motion_sensor(ia, -0.12, 0, 0.8, facing=1)
+    icons.motion_sensor(ia, 3.12, 0, 0.8, facing=-1)
+    icons.trolley(ia, 0.9, 0, 0.8, "#f3d3d3", "A")
+    icons.trolley(ia, 2.0, 0, 0.8, "#cfdcf3", "B")
     ax = axs[1]
     p1, p2 = m1 * v1, m2 * v2
     ax.plot(t, p1, color=RED, lw=1.1, label="A")
@@ -415,7 +432,7 @@ def fig_trolleys():
     ax.set_xlabel(r"time $t$ (s)")
     ax.set_ylim(-0.02, 0.36)
     ax.set_xlim(0, 3.0)
-    ax.legend(loc="center right", fontsize=8.2, ncol=3)
+    ax.legend(loc="center left", fontsize=8.2, ncol=1)
     fig.align_ylabels(axs)
     save(fig, "f_trolleys", w)
 
@@ -434,7 +451,7 @@ def fig_explosion():
     for ax in axs:
         ax.plot([-3.2, 3.2], [0, 0], color=EARTH, lw=1.4)
         ax.set_xlim(-3.2, 3.2)
-        ax.set_ylim(-0.25, 1.3)
+        ax.set_ylim(-0.25, 1.8)
         ax.set_aspect("equal")
         plain_axes(ax)
     ax = axs[0]
@@ -451,8 +468,8 @@ def fig_explosion():
     ax.text(-2.1, 0.95, r"0.40 m s$^{-1}$", color=RED, ha="center", va="bottom", fontsize=8.5)
     arrow(ax, 1.75, 0.85, 1.75 + k * 0.20, 0.85, color=BLUE, lw=1.6)
     ax.text(2.0, 0.95, r"0.20 m s$^{-1}$", color=BLUE, ha="center", va="bottom", fontsize=8.5)
-    ax.text(-0.1, 0.45, "$p = -0.40 + 0.40 = 0$", ha="center", va="center", fontsize=9)
-    ax.text(-3.1, 1.25, "After", fontsize=9, va="top")
+    ax.text(0.05, 1.35, "$p = -0.40 + 0.40 = 0$", ha="center", va="center", fontsize=9)
+    ax.text(-3.1, 1.75, "After", fontsize=9, va="top")
     save(fig, "f_explosion", w)
 
 
@@ -517,14 +534,14 @@ def fig_conical():
     arrow(ax, r, 0, r, k * T * np.cos(th), color=BLUE, lw=0.9, ls="--", ms=7, z=5)
     arrow(ax, r, 0, r - k * T * np.sin(th), 0, color=BLUE, lw=0.9, ls="--", ms=7, z=5)
     ax.text(r + 0.02, k * T * np.cos(th) * 0.55, f"$T\\cos\\theta$\n= {T*np.cos(th):.2f} N", color=BLUE, fontsize=8.2)
-    ax.text(r - k * T * np.sin(th) - 0.03, 0.045, f"$T\\sin\\theta = {T*np.sin(th):.2f}$ N", color=BLUE, fontsize=8.2, ha="right", va="bottom")
+    ax.text(r - k * T * np.sin(th) / 2, -0.11, f"$T\\sin\\theta = {T*np.sin(th):.2f}$ N", color=BLUE, fontsize=8.2, ha="center", va="top")
     force(ax, r, 0, 0, -k * m * G, RED, f"weight {m*G:.2f} N", lx=0.02, ly=0.0, fs=8.5)
-    ax.text(-0.02, 0.1, "centre", fontsize=8, ha="right", color="0.4")
-    dimline(ax, 0, -0.42, r, -0.42)
-    ax.text(r / 2, -0.45, f"$r = L\\sin\\theta = {r:.2f}$ m", ha="center", va="top", fontsize=8.5)
+    ax.text(-0.03, 0.12, "centre", fontsize=8, ha="right", color="0.4")
+    dimline(ax, 0, -0.5, r, -0.5)
+    ax.text(r / 2, -0.53, f"$r = L\\sin\\theta = {r:.2f}$ m", ha="center", va="top", fontsize=8.5)
     ax.text(-0.05, h / 2, f"$L$ = {L:.2f} m", fontsize=8.5, ha="right")
     ax.set_xlim(-0.55, 0.85)
-    ax.set_ylim(-0.6, h + 0.12)
+    ax.set_ylim(-0.68, h + 0.12)
     ax.set_aspect("equal")
     plain_axes(ax)
     save(fig, "f_conical", w)

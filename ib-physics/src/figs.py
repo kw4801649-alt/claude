@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch, Rectangle, Circle, FancyBboxPatch, Arc, Polygon
 
 OUT = sys.argv[1]
+import icons
 
 # CMU Serif Bold is flagged "expanded", which stops matplotlib matching it for weight="bold"
 from matplotlib import font_manager as _fm
@@ -64,11 +65,46 @@ EARTHFILL = "#e9e1d3"
 sizes = {}
 
 
+# printed widths in the compact layout (inches): half-width figures, and a few full-width ones
+DISPLAY = 2.45
+DISPLAY_FULL = 4.8
+FULL_NAMES = {"f_terminal", "f_fbd", "f_thirdlaw", "f_stokes"}
+FONT_BOOST = 1.22   # labels stay readable (about 7 pt) at the small printed size
+LINE_BOOST = 1.25
+BOOST_OVERRIDE = {"f_concept": 1.0, "f_threegraphs": 1.0, "f_throwup": 1.0, "f_boat": 1.0, "f_chord": 1.1,
+                  "f_motiondiag": 1.1}
+
+
 def save(fig, name, width):
-    """Save at the size it will be printed so the fonts come out at true size."""
-    fig.savefig(f"{OUT}/{name}.png", bbox_inches="tight", pad_inches=0.04, facecolor="white")
+    """Shrink the finished figure to its printed width, then save it at that size.
+
+    Everything scales together (so the layout is unchanged), except that text, lines and
+    markers are scaled a little less, to stay legible at the small size."""
+    from matplotlib.text import Text
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch, FancyArrowPatch
+    from matplotlib.collections import Collection
+    disp = DISPLAY_FULL if name in FULL_NAMES else DISPLAY
+    k = disp / width
+    fig.set_size_inches(fig.get_size_inches() * k)
+    boost = BOOST_OVERRIDE.get(name, FONT_BOOST)
+    legend_texts = {id(t) for ax_ in fig.axes if ax_.get_legend() for t in ax_.get_legend().findobj(Text)}
+    for t in fig.findobj(Text):
+        b = min(boost, 1.05) if id(t) in legend_texts else boost
+        t.set_fontsize(t.get_fontsize() * k * b)
+    for l in fig.findobj(Line2D):
+        l.set_linewidth(l.get_linewidth() * k * LINE_BOOST)
+        l.set_markersize(l.get_markersize() * k * LINE_BOOST)
+        l.set_markeredgewidth(l.get_markeredgewidth() * k * LINE_BOOST)
+    for p_ in fig.findobj(Patch):
+        p_.set_linewidth(p_.get_linewidth() * k * LINE_BOOST)
+        if isinstance(p_, FancyArrowPatch):
+            p_.set_mutation_scale(p_.get_mutation_scale() * k * LINE_BOOST)
+    for c in fig.findobj(Collection):
+        c.set_linewidths([lw * k * LINE_BOOST for lw in np.atleast_1d(c.get_linewidths())])
+    fig.savefig(f"{OUT}/{name}.png", bbox_inches="tight", pad_inches=0.03, facecolor="white", dpi=400)
     plt.close(fig)
-    sizes[name] = width
+    sizes[name] = disp
 
 
 def arrow(ax, x0, y0, x1, y1, color="black", lw=1.4, ms=10, style="-|>", ls="-", z=3):
@@ -194,7 +230,7 @@ def fig_chord_tangent():
     ax.text(4.12, 1.4, "tangent at $t = 3$ s\ninstantaneous velocity\n$=$ its gradient $= 6$ m s$^{-1}$",
             color=RED, fontsize=9.5, va="bottom", ha="left")
     ax.text(0.15, 23.2, r"$s = t^2$  (example motion)", fontsize=9.5)
-    ax.set_xlim(0, 6.8)
+    ax.set_xlim(0, 7.3)
     ax.set_ylim(0, 26)
     ax.set_xlabel(r"time $t$ (s)")
     ax.set_ylabel(r"displacement $s$ (m)")
@@ -353,7 +389,14 @@ def fig_real_car():
     ax.plot(ts, vs, "o", ms=2.6, color="black", label="GPS readings (every 0.5 s)", zorder=5)
     ax.set_ylabel(r"velocity $v$ (m s$^{-1}$)")
     ax.set_ylim(-0.8, 17)
-    ax.legend(loc="upper right", fontsize=8.2)
+    ax.legend(loc="lower center", bbox_to_anchor=(0.62, 0.02), fontsize=7.5, handlelength=1.6, borderpad=0.3, labelspacing=0.25)
+    ia = icons.inset(ax, [0.005, 0.3, 0.08, 0.62], (-0.3, 0.3), (0, 1.7))
+    icons.traffic_light(ia, 0, 0, 1.0, "green")
+    ia = icons.inset(ax, [0.915, 0.3, 0.08, 0.62], (-0.3, 0.3), (0, 1.7))
+    icons.traffic_light(ia, 0, 0, 1.0, "red")
+    ia = icons.inset(ax, [0.36, 0.72, 0.2, 0.25], (-1.2, 1.2), (-0.1, 0.9))
+    icons.car(ia, 0, 0, 1.0)
+    ia.plot([-1.2, 1.2], [0, 0], color="0.4", lw=0.8)
     ax.annotate("gear changes", xy=(5.6, np.interp(5.6, t, v)), xytext=(6.6, 5.0), fontsize=8.5,
                 arrowprops=dict(arrowstyle="-", lw=0.7, color="0.3"))
     ax.annotate("", xy=(2.3, np.interp(2.3, t, v)), xytext=(6.5, 5.3),
@@ -415,6 +458,8 @@ def fig_throw_up():
     fig, axs = plt.subplots(3, 1, figsize=(w, 5.4), sharex=True, gridspec_kw=dict(hspace=0.12))
     ax = axs[0]
     ax.plot(t, u * t - 0.5 * G * t ** 2, color="black", lw=1.5)
+    tb = np.arange(0.25, T, 0.5)
+    icons.ball_markers(ax, tb, u * tb - 0.5 * G * tb ** 2, size=7, color="#e67e22")
     ax.plot(T / 2, u ** 2 / (2 * G), "o", color=RED, ms=5, zorder=5)
     ax.text(T / 2 + 0.08, u ** 2 / (2 * G) + 0.6, r"top: $H = u^2/2g = 19.6$ m", color=RED, fontsize=9, va="bottom")
     ax.text(T / 2, 2.0, r"launch and landing at $y = 0$,  $T = 2u/g = 4.0$ s", color="0.35", fontsize=9, ha="center")
@@ -536,15 +581,18 @@ def fig_drop_vs_throw():
         ax.plot([0, x], [y, y], color="0.7", lw=0.7, zorder=1)
         if tk > 0:
             ax.text(x + 0.35, y - 0.2, f"{tk:.2f} s", fontsize=8, color="0.35", va="bottom")
-    ax.plot(np.zeros_like(fall), fall, "o", color=RED, ms=6, zorder=4, label="dropped from rest")
-    ax.plot(xs, fall, "o", color=BLUE, ms=6, zorder=5, label=r"thrown sideways at 6.0 m s$^{-1}$")
+    icons.ball_markers(ax, np.zeros_like(fall), fall, size=8, color="#c0392b")
+    icons.ball_markers(ax, xs, fall, size=8, color="#2e6fd1")
+    ax.plot([], [], "o", color="#c0392b", ms=6, label="dropped from rest")
+    ax.plot([], [], "o", color="#2e6fd1", ms=6, label=r"thrown sideways at 6.0 m s$^{-1}$")
+    ax.add_patch(Rectangle((-1.0, -0.8), 0.75, 0.55, fc=icons.WOOD, ec=icons.WOOD_DARK, lw=0.6, zorder=3))
     ax.text(9.3, 5.6, "Same height at every\ninstant: vertical motion\nis not affected by the\nsideways motion",
             fontsize=8.5, va="center")
     ax.set_xlim(-1, 15)
     ax.set_ylim(12.4, -0.8)
     ax.set_xlabel(r"horizontal distance $x$ (m)")
     ax.set_ylabel("distance fallen (m)")
-    ax.legend(loc="upper right", fontsize=8.2)
+    ax.legend(loc="upper right", fontsize=7.5, handlelength=1.2, borderpad=0.3, labelspacing=0.25)
     save(fig, "f_dropthrow", w)
 
 
@@ -558,7 +606,7 @@ def fig_projectile_vectors():
     t = np.linspace(0, T, 300)
     fig, ax = plt.subplots(figsize=(w, 3.4))
     ax.plot(ux * t, uy * t - 0.5 * G * t ** 2, ls="--", color="black", lw=1.0)
-    ground(ax, -3, R + 10)
+    icons.grass(ax, -3, R + 10, 0, 1.6)
     k = 0.38  # metres of drawing per m/s, the same for every arrow
     for frac in (0, 0.25, 0.5, 0.75, 1.0):
         tk = frac * T
@@ -604,7 +652,13 @@ def fig_angles():
                 arrowprops=dict(arrowstyle="->", lw=0.7, color="0.3"))
     ax.annotate("30° and 60° land\nat the same place", xy=(r30, 0.1), xytext=(37.5, 6.5), fontsize=8.5,
                 arrowprops=dict(arrowstyle="->", lw=0.7, color="0.3"))
-    ax.legend(title="launch angle", loc="upper right", fontsize=8.2, title_fontsize=8.5)
+    for ang, (c, ls) in styles.items():
+        th = np.radians(ang)
+        H = (u * np.sin(th)) ** 2 / (2 * G)
+        xm = u ** 2 * np.sin(2 * th) / (2 * G)
+        ax.text(xm, H + 0.4, f"{ang}°", color=c, ha="center", va="bottom", fontsize=8.5,
+                weight="bold" if ang == 45 else "normal")
+
     ax.set_xlim(0, 48)
     ax.set_ylim(0, 21)
     ax.set_xlabel(r"horizontal distance $x$ (m)")
@@ -618,9 +672,8 @@ def cliff_scene(ax, H, u, ang, xmax, show_numbers):
     tl = (uy + np.sqrt(uy ** 2 + 2 * G * H)) / G
     R = ux * tl
     t = np.linspace(0, tl, 300)
-    ax.add_patch(Rectangle((-9, 0), 9, H, fc=EARTHFILL, ec="none", zorder=1))
-    ax.plot([-9, 0, 0], [H, H, 0], color=EARTH, lw=1.6, zorder=2)
-    ground(ax, -9, xmax)
+    icons.cliff(ax, -9, 0, H, 0, sea=True, xmax=xmax)
+    icons.person(ax, -3.2, H, 1.6, arms="up")
     ax.plot(ux * t, H + uy * t - 0.5 * G * t ** 2, ls="--", color="black", lw=1.1)
     ax.plot([0, xmax], [H, H], ls=":", color=GREY, lw=0.8)
     arrow(ax, 0, H, 0.22 * ux, H + 0.22 * uy, color=BLUE, lw=1.6, ms=9, z=6)
@@ -637,12 +690,12 @@ def fig_cliff_general():
     H, u, ang = 20.0, 15.0, 30
     R, tl, ux, uy = cliff_scene(ax, H, u, ang, 52, False)
     ax.text(4.9, H + 0.6, r"$\theta$", fontsize=10)
-    ax.text(-3.2, H + 3.6, r"$\mathbf{u}$", color=BLUE, fontsize=12)
-    ax.text(-8.6, H - 2.0, "cliff top", fontsize=8.5, color="0.3")
+    ax.text(2.6, H + 2.6, r"$\mathbf{u}$", color=BLUE, fontsize=12)
+    ax.text(-8.6, H - 2.6, "cliff", fontsize=8.5, color="0.15", zorder=5)
     ax.text(19, 26.5, "path rises and falls back to launch level\n(symmetric part)", ha="center", fontsize=8.5)
     ax.text(15, 9.5, "...then keeps falling $h$ more\nbefore reaching the ground", ha="center", fontsize=8.5)
     dimline(ax, R + 4, 0, R + 4, H, color=RED)
-    ax.text(R + 5, H / 2, r"$s_y = -h$", color=RED, fontsize=10, va="center")
+    ax.text(R + 4, H + 1.2, r"$s_y = -h$", color=RED, fontsize=10, ha="center", va="bottom")
     ax.text(R, -1.4, "lands here", ha="center", va="top", fontsize=8.5)
     ax.set_xlim(-9, 52)
     ax.set_ylim(-4, 31)
@@ -731,8 +784,12 @@ def fig_terminal():
     ax.axvline(t_open, ls=":", color="0.5", lw=0.8)
     ax.text(0.8, v1 + 1.2, "1st terminal speed", fontsize=8, color="0.35", va="bottom")
     ax.text(49, v2 + 1.2, "2nd terminal speed", fontsize=8, color="0.35", ha="right", va="bottom")
-    ax.text(t_open + 4.5, 18, "parachute\nopens at\n$t = 15$ s", fontsize=8, color="0.35")
-    ax.text(22, 40, "speed drops\nfast while\ndrag > weight", fontsize=8)
+    ax.text(17.5, 26, "parachute\nopens at\n$t = 15$ s", fontsize=8, color="0.35")
+    ax.text(21, 52, "speed drops\nfast while\ndrag > weight", fontsize=8, va="top")
+    ia = icons.inset(ax, [0.06, 0.36, 0.22, 0.16], (-0.8, 0.8), (-0.35, 0.45))
+    icons.skydiver(ia, 0, 0, 1.0)
+    ia = icons.inset(ax, [0.66, 0.1, 0.3, 0.44], (-1, 1), (-0.1, 3.5))
+    icons.parachutist(ia, 0, 0, 1.0)
     ax.set_xlim(0, 50)
     ax.set_ylim(0, 66)
     ax.set_title("Skydiver with parachute", fontsize=9.5)
@@ -800,13 +857,16 @@ def fig_drag_projectile():
     fig, ax = plt.subplots(figsize=(w, 3.3))
     ax.plot(xi, yi, ls="--", color="black", lw=1.3, label="no air resistance (ideal)")
     ax.plot(xd, yd, color=RED, lw=1.6, label="with air resistance")
+    icons.grass(ax, 0, 172, 0, 2.5)
+    idx = np.linspace(0, xd.size - 1, 7).astype(int)[1:-1]
+    icons.ball_markers(ax, xd[idx], yd[idx], size=6.5, color="#f2f2f2")
     i = np.argmax(yd)
     ax.annotate("with drag: steeper descent,\nshorter range, lower peak", xy=(xd[i] - 5, yd[i] + 0.3),
                 xytext=(5, 39.5), fontsize=8.5, color=RED, arrowprops=dict(arrowstyle="->", color=RED, lw=0.7))
     ax.text(xi[-1] - 3, 2.0, "ideal path: symmetric", ha="right", fontsize=8.5, color="0.3")
-    ax.legend(loc="upper right", fontsize=8.2)
+    ax.legend(loc="upper right", fontsize=7, handlelength=1.6, borderpad=0.3, labelspacing=0.25)
     ax.set_xlim(0, 172)
-    ax.set_ylim(0, 47)
+    ax.set_ylim(-2.5, 47)
     ax.set_xlabel(r"horizontal distance $x$ (m)")
     ax.set_ylabel(r"height $y$ (m)")
     save(fig, "f_dragproj", w)
@@ -845,7 +905,7 @@ def fig_boat():
     w = 5.2
     fig, ax = plt.subplots(figsize=(w, 3.3))
     ax.set_xlim(-0.2, 10.4)
-    ax.set_ylim(-0.4, 7.4)
+    ax.set_ylim(-1.1, 7.4)
     plain_axes(ax)
     k = 1.2  # drawing units per m/s, the same for every arrow
     x0 = 4.6
@@ -865,8 +925,13 @@ def fig_boat():
     ax.text(x0 - 0.15, 1.3, r"boat relative to ground $= +4.2$ m s$^{-1}$", ha="right", va="center", fontsize=9)
     for y in (6.3, 2.85):
         ax.plot([x0, x0], [y + 0.25, y - 1.8], color="0.7", lw=0.6, ls=":")
-    arrow(ax, 3.2, 0.05, 6.2, 0.05, color="0.4", lw=1.0, ms=8)
-    ax.text(4.7, -0.1, "positive direction = the way the river flows", ha="center", va="top", fontsize=8.5, color="0.3")
+    icons.water(ax, -0.2, 10.4, -1.1, 0.05, n_waves=10)
+    ia = icons.inset(ax, [0.0, 0.0, 0.2, 0.17], (-1.6, 1.6), (-0.3, 0.8))
+    icons.boat(ia, 0.2, 0.0, 0.9, facing=-1)
+    ia = icons.inset(ax, [0.8, 0.0, 0.2, 0.17], (-1.6, 1.6), (-0.3, 0.8))
+    icons.boat(ia, -0.2, 0.0, 0.9, facing=1)
+    arrow(ax, 3.2, -0.45, 6.2, -0.45, color="white", lw=1.2, ms=8, z=5)
+    ax.text(4.7, -0.6, "river flow = positive direction", ha="center", va="top", fontsize=8.5, color="white", zorder=5)
     save(fig, "f_boat", w)
 
 
