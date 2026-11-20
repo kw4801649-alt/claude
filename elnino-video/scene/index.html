@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>How El Niño Forms — scene</title>
+<!--
+  scene/index.html — the complete 3D scene for "How El Niño Forms".
+
+  Every visual (3D objects, camera, labels, diagrams) is a PURE FUNCTION of one
+  timeline variable t (seconds). Nothing reads the wall clock and there is no
+  Math.random(): random-looking layouts come from a seeded PRNG. So any frame can be
+  rendered on its own and comes out identical on every run.
+
+  Served by render/serve.mjs from the project root (ES modules can't load from file://).
+    Render mode : /scene/index.html                -> exposes window.renderAt(t)
+    Preview     : /scene/index.html?preview=1      -> scrubber + play with narration
+    Single still: /scene/index.html?t=123.4
+  Scene timing comes from /config/scenes.json (same file the TTS and SRT tools read).
+-->
+<style>
+  @font-face { font-family: "InterV"; font-weight: 400; src: url("/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2") format("woff2"); }
+  @font-face { font-family: "InterV"; font-weight: 600; src: url("/node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2") format("woff2"); }
+  @font-face { font-family: "InterV"; font-weight: 700; src: url("/node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2") format("woff2"); }
+  @font-face { font-family: "InterV"; font-weight: 800; src: url("/node_modules/@fontsource/inter/files/inter-latin-800-normal.woff2") format("woff2"); }
+  :root { --ink: #0f2a44; --ink2: #3c5674; --warm: #e0522b; --cold: #2f7fc8; --paper: rgba(255,255,255,0.9); }
+  html, body { margin: 0; padding: 0; background: #dfeaf4; overflow: hidden; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0; background: #dfeaf4; }
+  #gl { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: block; }
+  #leaders { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
+  #overlay { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none;
+             font-family: "InterV", sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+  #fade { position: absolute; inset: 0; background: #eef5fb; opacity: 0; pointer-events: none; }
+  #overlay > * { position: absolute; visibility: hidden; opacity: 0; }
+
+  .label { left: 0; top: 0; white-space: nowrap; background: var(--paper); border-radius: 999px;
+           padding: 9px 20px 10px; font-weight: 700; font-size: 27px; letter-spacing: -0.2px;
+           box-shadow: 0 4px 16px rgba(15,42,68,0.18); display: flex; align-items: center; gap: 10px; }
+  .label.warm { color: #b8391c; } .label.cold { color: #1f5fa8; } .label.small { font-size: 23px; padding: 7px 16px 8px; }
+  .label svg { width: 30px; height: 30px; flex: none; }
+  .chip { left: 48px; top: 40px; font-weight: 800; font-size: 24px; letter-spacing: 1.6px; text-transform: uppercase;
+          background: var(--ink); color: #fff; border-radius: 10px; padding: 10px 18px; }
+  .note { left: 50px; top: 104px; font-weight: 600; font-size: 21px; color: var(--ink2);
+          background: rgba(255,255,255,0.75); border-radius: 8px; padding: 6px 12px; }
+  .card { background: var(--paper); border-radius: 20px; padding: 20px 28px 22px; box-shadow: 0 8px 30px rgba(15,42,68,0.2);
+          font-size: 29px; font-weight: 600; line-height: 1.3; }
+  .def { right: 48px; top: 40px; max-width: 640px; }
+  .def b { display: block; font-size: 22px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; color: var(--warm); margin-bottom: 4px; }
+  .title { left: 0; width: 1920px; top: 130px; text-align: center; }
+  .title h1 { margin: 0; font-size: 112px; font-weight: 800; letter-spacing: -3px; color: var(--ink);
+              text-shadow: 0 4px 30px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.8); }
+  .title p { margin: 18px 0 0; font-size: 36px; font-weight: 600; color: var(--ink2); text-shadow: 0 0 18px rgba(255,255,255,0.95); }
+  .big { left: 50%; top: 70px; transform: translateX(-50%); text-align: center; }
+  .big h2 { margin: 0; font-size: 64px; font-weight: 800; letter-spacing: -1.5px; }
+  .big p { margin: 6px 0 0; font-size: 28px; font-weight: 600; color: var(--ink2); }
+  .diagram { left: 1240px; top: 110px; width: 640px; height: 540px; padding: 0; }
+  .chart { left: 420px; top: 30px; width: 1440px; height: 360px; padding: 0; }
+  .recap { left: 60px; top: 150px; width: 640px; }
+  .recap ol { margin: 6px 0 0; padding-left: 44px; }
+  .recap li { margin: 10px 0; font-size: 34px; font-weight: 700; }
+  .recap h3 { margin: 0; font-size: 24px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--warm); }
+  .end { left: 0; width: 1920px; top: 0; height: 1080px; display: flex; flex-direction: column; align-items: center;
+         justify-content: center; background: rgba(238,245,251,0.82); text-align: center; }
+  .end h1 { margin: 0; font-size: 104px; font-weight: 800; letter-spacing: -3px; }
+  .end p { margin: 14px 0 0; font-size: 32px; font-weight: 600; color: var(--ink2); }
+  .temp { left: 50%; top: 60px; transform: translateX(-50%); text-align: center; padding: 22px 44px; }
+  .temp .n { font-size: 84px; font-weight: 800; color: var(--warm); letter-spacing: -2px; line-height: 1; }
+  .temp .s { font-size: 28px; font-weight: 600; color: var(--ink2); margin-top: 8px; white-space: nowrap; }
+  #controls { position: fixed; left: 0; right: 0; bottom: 0; display: none; gap: 12px; align-items: center; padding: 10px 16px;
+              background: rgba(15,42,68,0.92); color: #fff; font: 14px/1.2 system-ui, sans-serif; }
+  #controls input[type=range] { flex: 1; }
+  #controls button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 0; cursor: pointer; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl" width="1920" height="1080"></canvas>
+  <svg id="leaders" viewBox="0 0 1920 1080"></svg>
+  <div id="overlay"></div>
+  <div id="fade"></div>
+</div>
+<div id="controls">
+  <button id="play">Play</button>
+  <input id="scrub" type="range" min="0" max="385" step="0.0333" value="0">
+  <span id="clock">0:00.0</span>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+
+/* ============================================================== config & timeline */
+const params = new URLSearchParams(location.search);
+const PREVIEW = params.has("preview");
+const CFG = await (await fetch("/config/scenes.json")).json();
+const W = CFG.video.width, H = CFG.video.height, FPS = CFG.video.fps;
+const S = {};
+let TOTAL = 0;
+for (const s of CFG.scenes) { S[s.id] = { start: TOTAL, dur: s.duration, end: TOTAL + s.duration, title: s.title }; TOTAL += s.duration; }
+const at = (id, local) => S[id].start + local;           // scene-local seconds -> absolute seconds
+const inScene = (id, t) => t >= S[id].start && t < S[id].end;
+
+/* ============================================================== deterministic math */
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const smooth = (e0, e1, x) => { const k = clamp((x - e0) / (e1 - e0)); return k * k * (3 - 2 * k); };
+const ease = k => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const fract = x => x - Math.floor(x);
+const gauss = (d, w) => Math.exp(-(d / w) * (d / w));
+const win = (t, a, b, fi = 0.5, fo = 0.5) => Math.min(smooth(a, a + fi, t), 1 - smooth(b - fo, b, t));
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let r = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/** Keyframe track: [[time, value], ...] sorted by time, eased between keys, held outside. */
+function track(keys) {
+  return t => {
+    if (t <= keys[0][0]) return keys[0][1];
+    for (let i = 0; i < keys.length - 1; i++) {
+      const [t0, v0] = keys[i], [t1, v1] = keys[i + 1];
+      if (t < t1) return t1 - t0 < 1e-6 ? v1 : lerp(v0, v1, ease((t - t0) / (t1 - t0)));
+    }
+    return keys[keys.length - 1][1];
+  };
+}
+/** Cumulative integral of f over [0, TOTAL], tabulated at 120 Hz (trapezoid rule). */
+function integral(f) {
+  const dt = 1 / 120, n = Math.ceil(TOTAL / dt) + 2, tab = new Float64Array(n);
+  let prev = f(0);
+  for (let i = 1; i < n; i++) { const cur = f(i * dt); tab[i] = tab[i - 1] + 0.5 * (prev + cur) * dt; prev = cur; }
+  return t => { const x = clamp(t / dt, 0, n - 1.001), i = Math.floor(x); return lerp(tab[i], tab[i + 1], x - i); };
+}
+
+/* ============================================================== geography helpers */
+// Pacific box: longitude 100E..300E (60W) -> x -60..60 ; latitude 22N..15S -> z -13.2..9
+const X0 = -60, X1 = 60, ZN = -13.2, ZS = 9.0, DEPTH = 14, LAND_H = 0.7, INSET = 0.05;
+const FRONT = ZS - INSET;
+const bx = lon => ((lon < 0 ? lon + 360 : lon) - 200) * 0.6;
+const bz = lat => -lat * 0.6;
+const latOfZ = z => -z / 0.6;
+function interpTable(tab, v) {
+  if (v <= tab[0][0]) return tab[0][1];
+  for (let i = 0; i < tab.length - 1; i++) if (v <= tab[i + 1][0]) {
+    const k = (v - tab[i][0]) / (tab[i + 1][0] - tab[i][0]); return lerp(tab[i][1], tab[i + 1][1], k);
+  }
+  return tab[tab.length - 1][1];
+}
+// Pacific coast of the Americas: [lat, lon]
+const COAST = [[-15, -75.5], [-5, -81.2], [0, -80.2], [1.8, -78.8], [4, -77.3], [6.5, -77.5], [7.5, -79.5], [8.2, -82.9],
+  [10, -85.7], [13.2, -89], [15.6, -93.5], [16.2, -98.5], [17.5, -101.5], [20.4, -105.6], [22, -105.6]];
+const coastX = lat => bx(interpTable(COAST, lat));
+
+// Land inside the Pacific box (lon, lat). Pieces touching the box edge are pre-clipped along it.
+const BOX_LAND = [
+  { name: "Indochina", pts: [[100, 22], [107.5, 21.6], [106.6, 20.2], [105.7, 18.8], [106.6, 17.3], [108.8, 15.4], [109.3, 12.6], [109, 11.4], [107, 10.4], [105.1, 8.7], [104.8, 10.4], [103.2, 10.8], [102.4, 12.2], [100.9, 12.7], [100.4, 13.6], [100, 13.5]] },
+  { name: "Malaya", pts: [[100, 7.8], [100.4, 6.5], [100.4, 4.5], [101.3, 2.8], [103.5, 1.3], [104.3, 1.4], [103.4, 4], [102.3, 6.1], [101.2, 6.9], [100.3, 8.4], [100, 8.6]] },
+  { name: "Sumatra", pts: [[100, 2.9], [100.3, 2.5], [101.5, 2], [103.7, -1], [106, -3], [105.9, -5.8], [104.5, -5.9], [102.3, -4], [101, -2.5], [100, -1.2]] },
+  { name: "Java", pts: [[105.2, -6.8], [106, -5.9], [108.3, -6.2], [110.4, -6.9], [112.6, -6.9], [114.6, -7.7], [114.4, -8.7], [111, -8.2], [108.3, -7.8], [106.4, -7.4]] },
+  { name: "Lesser Sunda", pts: [[115.1, -8.1], [116.5, -8.2], [119, -8.4], [122, -8.2], [124, -8.4], [124.8, -8.9], [122, -8.9], [119, -8.8], [116, -8.9]] },
+  { name: "Timor", pts: [[124, -9.3], [125.2, -8.4], [127.3, -8.4], [125.3, -9.6], [124.2, -10.2]] },
+  { name: "Borneo", pts: [[109, 1.7], [109.6, -1], [110.2, -2.9], [111.7, -3.4], [113, -3.2], [114.5, -3.9], [116, -3.7], [116.3, -1.6], [117.6, 0.8], [117.9, 1.8], [119, 5.1], [117.6, 6.9], [116.7, 6.8], [115.4, 5.2], [113.9, 4.3], [111.5, 2.6], [110, 1.8]] },
+  { name: "Sulawesi", pts: [[119, -5.5], [120.4, -5.6], [121.5, -4.5], [122.8, -4.8], [121.8, -2.0], [123.4, -0.9], [121.2, -0.6], [120.8, 0.4], [124.4, 0.4], [125.0, 1.5], [122.0, 1.1], [120.3, 1.0], [119.6, -0.5], [118.8, -2.8]] },
+  { name: "New Guinea", pts: [[131, -1.3], [132.5, -0.4], [134, -0.9], [135, -3.3], [137.5, -1.5], [141, -2.6], [144.5, -3.8], [146, -5.5], [147.5, -6.1], [148, -8], [150.3, -10.4], [147.5, -10.1], [145, -8], [143.4, -8.8], [141, -9.1], [139, -8.1], [138, -7.5], [138.3, -6.5], [136, -4.6], [133.4, -4], [132, -2.9]] },
+  { name: "Luzon", pts: [[120.6, 18.5], [122.2, 18.5], [122.5, 17], [121.6, 15.8], [122, 14], [124, 13], [123.5, 12.6], [121.5, 13.7], [120.6, 14.3], [120.0, 16.0]] },
+  { name: "Visayas", pts: [[122, 11.8], [123.2, 11], [124.4, 12.4], [125.6, 11.2], [125.2, 10], [123.5, 9.6], [122.5, 10.7]] },
+  { name: "Mindanao", pts: [[122.1, 6.9], [123.6, 7.8], [125.4, 9.8], [126.6, 7.3], [125.6, 5.6], [124.2, 6.4], [123.5, 7.5]] },
+  { name: "Hainan", pts: [[108.6, 19.2], [110.5, 20.1], [111, 19.6], [109.6, 18.2]] },
+  { name: "Top End", shelf: true, pts: [[124, -15], [125.5, -14.2], [126.8, -13.8], [128.2, -14.9], [129.5, -14.9], [129.8, -13.5], [130.5, -12.3], [132.5, -11.3], [135, -12.2], [136.8, -12.2], [136, -13.5], [135.4, -15]] },
+  { name: "Cape York", shelf: true, pts: [[141.4, -15], [141.6, -12.6], [142.5, -10.7], [143.4, -12.5], [143.7, -14.2], [144.6, -14.4], [145.3, -15]] },
+  { name: "Americas", deep: true, pts: [[-75.5, -15], [-76, -14], [-77.5, -12], [-79, -8], [-81.2, -5.5], [-80.5, -2.5], [-80.2, 0], [-79.5, 1.5], [-78.8, 1.8], [-77.3, 4], [-77.5, 6.5], [-77.9, 7.3], [-78.2, 8.3], [-79.5, 8.9], [-80.4, 8.0], [-81.6, 7.4], [-82.9, 8.2], [-83.6, 8.5], [-85.7, 10], [-85.9, 11.2], [-87.5, 12.9], [-89.3, 13.4], [-91.4, 13.9], [-93.5, 15.6], [-94.8, 16.2], [-96.5, 15.7], [-98.5, 16.2], [-101.5, 17.5], [-105.6, 20.4], [-105.3, 21.5], [-105.6, 22], [-97.8, 22], [-97.4, 20.5], [-96.1, 19], [-94.5, 18.2], [-92, 18.6], [-90.5, 19.5], [-90.4, 21], [-87.1, 21.5], [-87.5, 19], [-88.2, 17], [-88.6, 15.9], [-86, 15.9], [-83.3, 15], [-83.6, 11], [-82, 9], [-79.5, 9.6], [-77.4, 8.7], [-75.6, 10.6], [-74.5, 11], [-72, 11.8], [-71.3, 10.8], [-70.0, 12.2], [-68.2, 10.6], [-66, 10.6], [-64, 10.6], [-62, 10.7], [-61, 10.2], [-60, 8.6], [-60, -15]] },
+  { name: "Hispaniola", pts: [[-74.4, 18.4], [-72.8, 19.9], [-69, 19.7], [-68.4, 18.6], [-71.6, 17.8]] },
+];
+const MOUNTAINS = [[-78, 1, 2.4], [-78.6, -2, 2.6], [-79.3, -5.5, 2.0], [-77.4, -9, 2.6], [-75.6, -12, 2.4], [-73.4, -14.2, 2.2],
+  [-75.8, 4.2, 2.0], [-73.8, 6.8, 1.7], [-71, 9.5, 1.5], [-103, 19.3, 1.8], [-99.5, 18.9, 1.6], [-91, 15.1, 1.5], [-86.4, 13.4, 1.2],
+  [-84, 10, 1.1], [-66, -10, 1.0], [-63, 2, 1.1], [138, -4.3, 2.0], [142.5, -5.6, 1.9], [145.5, -6.4, 1.6], [116.4, 5.6, 1.6],
+  [114, 1.0, 1.1], [101.6, -1.8, 1.4], [103.3, -3.8, 1.2], [107.7, -7.1, 1.1], [110.4, -7.5, 1.2], [112.9, -7.9, 1.1],
+  [121, 16.8, 1.2], [125, 7.6, 1.1], [104, 19, 1.3], [101.5, 17, 1.1], [120.3, -3.5, 1.1], [130.8, -13.2, 0.8], [143, -13.5, 0.9]];
+
+/* ============================================================== renderer, scene, camera */
+const canvas = document.getElementById("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H, false);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, W / H, 0.5, 4000);
+const C = hex => new THREE.Color(hex);
+
+// lights
+const SUN_POS = new THREE.Vector3(-60, 70, -160);
+scene.add(new THREE.HemisphereLight(0xeaf4ff, 0x5d6f8a, 1.6));
+const sunLight = new THREE.DirectionalLight(0xfff1d6, 2.2);
+sunLight.position.copy(SUN_POS).normalize().multiplyScalar(100);
+scene.add(sunLight);
+const fillLight = new THREE.DirectionalLight(0xdfe9ff, 0.7);
+fillLight.position.set(40, 30, 120);
+scene.add(fillLight);
+
+// sky dome (pale gradient)
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false,
+  uniforms: { top: { value: C("#9fcdf2") }, mid: { value: C("#e9f3fb") }, bot: { value: C("#d3e1ee") } },
+  vertexShader: `varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bot; varying vec3 vP;
+    void main(){ float h = vP.y; vec3 c = h > 0.0 ? mix(mid, top, pow(clamp(h*1.6,0.0,1.0),0.8)) : mix(mid, bot, clamp(-h*3.0,0.0,1.0));
+      gl_FragColor = vec4(c,1.0);
+      #include <colorspace_fragment>
+    }`,
+});
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 16), skyMat));
+
+// glow sprite texture (deterministic canvas drawing)
+function radialTexture(inner, outer, size = 256) {
+  const c = document.createElement("canvas"); c.width = c.height = size;
+  const g = c.getContext("2d"), grd = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grd.addColorStop(0, inner); grd.addColorStop(0.35, inner.replace(/[\d.]+\)$/, "0.55)")); grd.addColorStop(1, outer);
+  g.fillStyle = grd; g.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; return tex;
+}
+// sun
+const sunGroup = new THREE.Group();
+sunGroup.position.copy(SUN_POS);
+sunGroup.add(new THREE.Mesh(new THREE.IcosahedronGeometry(7, 1), new THREE.MeshBasicMaterial({ color: 0xffd45c })));
+const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture("rgba(255,226,140,1)", "rgba(255,226,140,0)"), depthWrite: false, transparent: true }));
+sunGlow.scale.set(60, 60, 1);
+sunGroup.add(sunGlow);
+scene.add(sunGroup);
+
+/* ============================================================== shared point-sprite material */
+function pointsMaterial(size) {
+  return new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { uSize: { value: size }, uVH: { value: H } },
+    vertexShader: `attribute vec3 aColor; attribute float aAlpha; uniform float uSize; uniform float uVH; varying vec3 vC; varying float vA;
+      void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv;
+        gl_PointSize = uSize * projectionMatrix[1][1] * uVH * 0.5 / max(0.1, -mv.z); vC = aColor; vA = aAlpha; }`,
+    fragmentShader: `varying vec3 vC; varying float vA;
+      void main(){ vec2 d = gl_PointCoord - 0.5; float r = length(d); if (r > 0.5 || vA < 0.003) discard;
+        gl_FragColor = vec4(vC, vA * smoothstep(0.5, 0.28, r));
+        #include <colorspace_fragment>
+      }`,
+  });
+}
+function makePoints(n, size) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  g.setAttribute("aColor", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  g.setAttribute("aAlpha", new THREE.BufferAttribute(new Float32Array(n), 1));
+  const p = new THREE.Points(g, pointsMaterial(size));
+  p.frustumCulled = false;
+  return p;
+}
+
+/* ============================================================== Pacific basin group */
+const basin = new THREE.Group();
+scene.add(basin);
+
+// --- regular grid helper (positions/colors rewritten every frame)
+function makeGrid(nx, ny) {
+  const g = new THREE.BufferGeometry(), nv = (nx + 1) * (ny + 1);
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
+  g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
+  const idx = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1;
+    idx.push(a, c, b, b, c, d);
+  }
+  g.setIndex(idx);
+  return g;
+}
+const NX = 120, NZ = 44, NY = 36;
+
+// --- colour ramps
+const SST_STOPS = [[21, C("#1f4fa3")], [23, C("#2f7fc8")], [25, C("#63b7dc")], [26.5, C("#b9e0d6")], [27.5, C("#f6dc8a")],
+  [28.5, C("#f6a24a")], [29.4, C("#e8622f")], [30.2, C("#c93a2b")]];
+const DEPTH_STOPS = [[1.0, C("#9df2e2")], [3.5, C("#43c1d9")], [6.5, C("#3f7fd0")], [9.0, C("#4651b5")], [12.0, C("#3a2a8a")]];
+function ramp(stops, v, out) {
+  if (v <= stops[0][0]) return out.copy(stops[0][1]);
+  for (let i = 0; i < stops.length - 1; i++) if (v <= stops[i + 1][0]) {
+    return out.lerpColors(stops[i][1], stops[i + 1][1], (v - stops[i][0]) / (stops[i + 1][0] - stops[i][0]));
+  }
+  return out.copy(stops[stops.length - 1][1]);
+}
+
+// --- physical fields (all pure functions of position and state)
+function thermoDepth(x, z, st) {
+  const tilt = smooth(-52, 46, x);
+  const hN = lerp(8.6, 2.0, tilt), hE = lerp(6.4, 5.0, tilt), hL = lerp(9.6, 1.3, tilt);
+  let h = st.e >= 0 ? lerp(hN, hE, st.e) : lerp(hN, hL, -st.e);
+  for (const w of st.waves) h += w.dh * gauss(x - w.x, w.wx) * gauss(z - w.z, w.wz);
+  return clamp(h, 0.6, DEPTH - 0.8);
+}
+function sst(x, z, st) {
+  const lat = latOfZ(z), cx = coastX(lat);
+  if (x > cx + 0.5) return 28.3;                               // Caribbean / Gulf of Mexico: not part of ENSO here
+  let T = 29.7 - 1.7 * smooth(-30, 48, x);
+  const tongue = 5.4 * smooth(-30, 40, x) * gauss(lat + 1.0, 5.5);
+  const coastal = 3.0 * gauss(x - cx, 3.8) * smooth(-1, 5, -lat);
+  const cold = tongue + coastal;
+  const e = st.e;
+  if (e >= 0) T += -cold * (1 - 0.85 * e) + e * 1.5 * smooth(-45, 0, x) * gauss(lat, 10);
+  else T += -cold * (1 + 0.45 * -e) - (-e) * 1.7 * smooth(-42, 0, x) * gauss(lat, 6);
+  for (const w of st.waves) T += w.dT * gauss(x - w.x, w.wx) * gauss(z - w.z, w.wz);
+  return T;
+}
+function surfaceY(x, z, t, st) {
+  let y = 0.06 * Math.sin(0.42 * x + 1.3 * t) * Math.sin(0.55 * z - 0.9 * t) + 0.04 * Math.sin(0.9 * x - 0.7 * z + 2.1 * t);
+  for (const w of st.waves) y += w.dy * gauss(x - w.x, w.wx) * gauss(z - w.z, w.wz);
+  return y;
+}
+
+// --- ocean surface (the "Pacific basin plane")
+const surfGeo = makeGrid(NX, NZ);
+const surfMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, transparent: true, opacity: 1, depthWrite: true });
+const surface = new THREE.Mesh(surfGeo, surfMat);
+surface.renderOrder = 3; surface.frustumCulled = false;
+basin.add(surface);
+
+// --- thermocline surface (depth/colour gradient)
+const thermoGeo = makeGrid(NX, NZ);
+const thermo = new THREE.Mesh(thermoGeo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
+thermo.renderOrder = 1; thermo.frustumCulled = false;
+basin.add(thermo);
+
+// --- front cross-section (equatorial profile)
+const faceGeo = makeGrid(NX, NY);
+const face = new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.93, side: THREE.DoubleSide, depthWrite: false }));
+face.renderOrder = 2; face.frustumCulled = false;
+basin.add(face);
+// bright thermocline line on the cross-section
+const ribbonGeo = makeGrid(NX, 1);
+const ribbon = new THREE.Mesh(ribbonGeo, new THREE.MeshBasicMaterial({ color: 0xc6f7ff, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
+ribbon.renderOrder = 5; ribbon.frustumCulled = false;
+basin.add(ribbon);
+
+// --- box walls (back, sides, bottom) with a vertical gradient
+function wall(w, h, pos, rotY, topHex, botHex) {
+  const g = new THREE.PlaneGeometry(w, h, 1, 1), col = [], top = C(topHex), bot = C(botHex);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const c = p.getY(i) > 0 ? top : bot; col.push(c.r, c.g, c.b); }
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  m.position.copy(pos); m.rotation.y = rotY; return m;
+}
+const BW = X1 - X0 - 2 * INSET, BD = ZS - ZN - 2 * INSET, BCZ = (ZS + ZN) / 2;
+basin.add(wall(BW, DEPTH, new THREE.Vector3(0, -DEPTH / 2, ZN + INSET), 0, "#1d4c96", "#0a1d48"));
+basin.add(wall(BD, DEPTH, new THREE.Vector3(X0 + INSET, -DEPTH / 2, BCZ), Math.PI / 2, "#1a4690", "#0a1d48"));
+basin.add(wall(BD, DEPTH, new THREE.Vector3(X1 - INSET, -DEPTH / 2, BCZ), -Math.PI / 2, "#1a4690", "#0a1d48"));
+const bottom = new THREE.Mesh(new THREE.PlaneGeometry(BW, BD), new THREE.MeshBasicMaterial({ color: 0x0a1d48, side: THREE.DoubleSide }));
+bottom.rotation.x = -Math.PI / 2; bottom.position.set(0, -DEPTH, BCZ);
+basin.add(bottom);
+
+// --- low-poly land
+const landTop = new THREE.MeshLambertMaterial({ color: 0x8dbb6a, flatShading: true });
+const landSide = new THREE.MeshLambertMaterial({ color: 0xa48a5e, flatShading: true });
+for (const piece of BOX_LAND) {
+  const shape = new THREE.Shape(piece.pts.map(([lon, lat]) => new THREE.Vector2(bx(lon), lat * 0.6)));
+  const base = piece.deep ? DEPTH : piece.shelf ? 2.2 : 3.0;
+  const g = new THREE.ExtrudeGeometry(shape, { depth: base + LAND_H, bevelEnabled: false, steps: 1, curveSegments: 1 });
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, -base, 0);
+  const mesh = new THREE.Mesh(g, [landTop, landSide]);
+  if (piece.shelf) mesh.position.z = 0.02;
+  basin.add(mesh);
+}
+const mountainMat = new THREE.MeshLambertMaterial({ color: 0x7a9a58, flatShading: true });
+for (const [lon, lat, h] of MOUNTAINS) {
+  const m = new THREE.Mesh(new THREE.ConeGeometry(0.75 + h * 0.35, h, 5, 1), mountainMat);
+  m.position.set(bx(lon), LAND_H + h / 2 - 0.05, bz(lat));
+  m.rotation.y = (lon * 7.3) % 6.28;
+  basin.add(m);
+}
+
+// --- wind arrows (instanced low-poly arrows)
+function arrowGeometry() {
+  const shaft = new THREE.BoxGeometry(1.3, 0.16, 0.42); shaft.translate(-0.35, 0, 0);
+  const head = new THREE.ConeGeometry(0.62, 0.8, 4, 1); head.rotateZ(-Math.PI / 2); head.scale(1, 0.32, 1); head.translate(0.7, 0, 0);
+  return mergeGeometries([shaft.toNonIndexed(), head.toNonIndexed()]);
+}
+const ARROW_GEO = arrowGeometry();
+const ROWS = [-10.2, -6.6, -3.0, 0.6, 4.2, 7.6];
+const COLS = 9, SPAN_W = -52, SPAN_E = 47, SPAN = SPAN_E - SPAN_W;
+const trade = new THREE.InstancedMesh(ARROW_GEO, new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x5a7391, emissiveIntensity: 0.35 }), ROWS.length * COLS);
+trade.frustumCulled = false; trade.renderOrder = 6;
+basin.add(trade);
+const burst = new THREE.InstancedMesh(ARROW_GEO, new THREE.MeshLambertMaterial({ color: 0xffc93c, emissive: 0x7a5a10, emissiveIntensity: 0.35 }), 14);
+burst.frustumCulled = false;
+basin.add(burst);
+
+// --- Walker circulation loop (tube + moving chevrons)
+const walkerMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, depthWrite: false });
+const walkerTube = new THREE.Mesh(new THREE.BufferGeometry(), walkerMat);
+walkerTube.renderOrder = 7; walkerTube.frustumCulled = false;
+basin.add(walkerTube);
+const CHEV = 26;
+const chevGeo = new THREE.ConeGeometry(0.75, 1.6, 4, 1); chevGeo.rotateX(Math.PI / 2); // tip -> +z
+const chevrons = new THREE.InstancedMesh(chevGeo, new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x8aa3c0, emissiveIntensity: 0.5 }), CHEV);
+chevrons.frustumCulled = false;
+basin.add(chevrons);
+function walkerCurve(xR, xS) {
+  const mid = (xR + xS) / 2, z = -1.0;
+  return new THREE.CatmullRomCurve3([
+    new THREE.Vector3(xR, 1.7, z), new THREE.Vector3(xR - 1.6, 7, z), new THREE.Vector3(xR + 2.5, 12.4, z),
+    new THREE.Vector3(mid, 13.6, z), new THREE.Vector3(xS - 2.5, 12.4, z), new THREE.Vector3(xS + 1.6, 7, z),
+    new THREE.Vector3(xS, 1.7, z), new THREE.Vector3(mid, 1.15, z)], true, "catmullrom", 0.5);
+}
+
+// --- convective clouds (two clusters: warm pool & central Pacific) + rain
+const CLUSTERS = [{ x: -40, z: -1.2 }, { x: -9, z: -0.6 }];
+const TOWERS = 8, PUFFS = 4;
+const cloudMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1),
+  new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xc2d0e2, emissiveIntensity: 0.35, flatShading: true }), CLUSTERS.length * TOWERS * PUFFS);
+cloudMesh.frustumCulled = false;
+basin.add(cloudMesh);
+const towerDefs = [];
+{
+  const r = mulberry32(42);
+  for (let c = 0; c < CLUSTERS.length; c++) for (let k = 0; k < TOWERS; k++) {
+    const ang = r() * Math.PI * 2, rad = 1.5 + r() * 7.5;
+    const tw = { c, k, x: CLUSTERS[c].x + Math.cos(ang) * rad * 1.25, z: CLUSTERS[c].z + Math.sin(ang) * rad * 0.65,
+      height: 6 + r() * 5.5, seed: r() * 100, puffs: [] };
+    for (let p = 0; p < PUFFS; p++) tw.puffs.push({ dx: (r() - 0.5) * 2.4, dz: (r() - 0.5) * 1.8, f: (p + 0.3) / PUFFS, s: 1.3 + r() * 1.1 });
+    towerDefs.push(tw);
+  }
+}
+const RAIN_PER = 12;
+const rainGeo = new THREE.BufferGeometry();
+rainGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(towerDefs.length * RAIN_PER * 6), 3));
+const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0x6fa8f0, transparent: true, opacity: 0.75 }));
+rain.frustumCulled = false;
+basin.add(rain);
+const rainDefs = [];
+{
+  const r = mulberry32(7);
+  for (let i = 0; i < towerDefs.length * RAIN_PER; i++) rainDefs.push({ dx: (r() - 0.5) * 3.2, dz: (r() - 0.5) * 2.4, ph: r() });
+}
+
+// --- upwelling particles (on the equatorial cross-section) + surface spreading
+const UP_N = 420, SPREAD_N = 260;
+const upPts = makePoints(UP_N, 0.5); upPts.renderOrder = 8; basin.add(upPts);
+const spreadPts = makePoints(SPREAD_N, 0.42); spreadPts.renderOrder = 8; basin.add(spreadPts);
+const upDefs = [], spreadDefs = [];
+{
+  const r = mulberry32(1234);
+  for (let i = 0; i < UP_N; i++) upDefs.push({ x0: lerp(25, 47.2, Math.sqrt(r())), ph: r(), sp: 0.8 + r() * 0.4 });
+  for (let i = 0; i < SPREAD_N; i++) spreadDefs.push({ lat: lerp(-14, 1.5, r()), ph: r(), sp: 0.7 + r() * 0.5, dz: (r() - 0.5) * 0.6 });
+}
+const COLD_P = C("#a4ecff"), WARM_P = C("#ffb26b");
+
+/* ============================================================== globe group */
+const globe = new THREE.Group();
+globe.rotation.order = "XYZ";
+scene.add(globe);
+const R = 30;
+const WORLD = [
+  // North America (incl. Central America)
+  [[-168, 66], [-162, 70], [-156, 71.3], [-140, 69.6], [-128, 70], [-115, 68.5], [-95, 72], [-85, 69], [-82, 66], [-88, 64], [-93, 59], [-85, 55], [-80, 52], [-78, 58], [-72, 61], [-64, 60], [-61, 56], [-56, 52], [-60, 47], [-65, 44], [-70, 42], [-74, 40.5], [-76, 37], [-75.5, 35], [-81, 31.5], [-80.5, 27], [-80.2, 25.3], [-81.8, 26.5], [-83, 29], [-85, 30], [-89, 30.2], [-94, 29.6], [-97.4, 27.8], [-97.8, 22], [-96, 18.8], [-94.5, 18.2], [-91, 18.7], [-90.5, 21], [-87, 21.5], [-88.3, 16], [-84, 15.8], [-83.6, 11], [-81.8, 9], [-79.5, 9.4], [-77.3, 8.6], [-77.8, 7.4], [-79.5, 8.9], [-80.5, 7.5], [-82.5, 8.2], [-85.7, 10.5], [-87.5, 13], [-91, 13.9], [-94, 16], [-96.5, 15.7], [-101, 17.5], [-105.5, 20.4], [-105.7, 22.5], [-109.4, 23.2], [-112, 26], [-112.5, 29], [-114.7, 31.5], [-114, 28], [-110, 24], [-112, 24.5], [-115, 28], [-117, 32.5], [-120.6, 34.5], [-122.5, 37.5], [-124.2, 40.5], [-124, 46.5], [-123, 48.2], [-127, 50.5], [-131, 54.5], [-136, 58.5], [-141, 60], [-147, 60.8], [-152, 59], [-158, 57], [-163, 55], [-158, 58.5], [-162, 60], [-165, 62.5], [-164.5, 64.5]],
+  // Greenland
+  [[-73, 78], [-60, 82], [-30, 83.5], [-20, 81], [-18, 76], [-22, 70.5], [-32, 68], [-40, 65], [-44, 60], [-50, 62], [-53, 66.5], [-55, 70], [-58, 75.5], [-66, 76.5]],
+  // South America
+  [[-77.3, 8.6], [-75.5, 10.8], [-72, 11.8], [-71.5, 10.5], [-70, 12.2], [-66, 10.6], [-62, 10.7], [-60, 8.5], [-57, 6], [-52, 5], [-50, 1.5], [-48, -1], [-44, -2.5], [-40, -3], [-35, -5.5], [-35, -9], [-38, -13], [-39, -17.5], [-41, -22], [-44.5, -23.2], [-48.5, -26], [-48.7, -28.5], [-52, -32.5], [-54, -34.8], [-57.5, -35], [-57, -37.5], [-62, -39], [-62.5, -41], [-65, -42], [-63.6, -42.6], [-65, -45], [-67.5, -46.5], [-66, -48], [-69, -51], [-68.3, -52.5], [-70, -54.5], [-73, -53.5], [-75.5, -50], [-74, -45], [-73.5, -40], [-73.5, -37], [-71.5, -32], [-71.5, -28], [-70.5, -23], [-70.2, -18.5], [-72, -17], [-76, -14], [-77.5, -12], [-79, -8], [-81.2, -5.5], [-80.5, -2.5], [-80.2, 0], [-79.5, 1.5], [-78.8, 1.8], [-77.3, 4], [-77.5, 6.5], [-78, 7.5]],
+  // Eurasia
+  [[-9.5, 43.2], [-9, 38.7], [-8.9, 37], [-6, 36.2], [-2, 36.7], [0.2, 38.8], [3.2, 42], [6, 43], [8.8, 44.4], [10.5, 43], [12.3, 41.7], [15.6, 40], [16, 38], [17.1, 39], [18.5, 40.2], [16, 41.5], [13.5, 43.6], [12.3, 45.3], [13.7, 45.6], [19, 42], [19.5, 40], [21, 37.5], [22.5, 36.5], [24, 38], [23, 40.5], [26, 40.6], [26.3, 39], [27.5, 37], [30.5, 36.3], [36, 36.6], [35.8, 34.5], [35, 32.5], [34.2, 31.3], [32.5, 30], [35, 28], [39, 21.5], [42.8, 14.5], [43.5, 12.7], [45, 13], [52, 16], [55, 17.5], [57.8, 19], [59.8, 22.5], [56.5, 24.5], [54, 24], [51.5, 24.5], [51.5, 26], [48, 29.5], [50.5, 29.5], [56, 27], [57.5, 25.6], [61.5, 25.2], [66.5, 25.4], [68, 23.5], [70, 21], [72.8, 19], [73.5, 15.8], [74.8, 12.8], [76.5, 8.6], [77.5, 8], [79.8, 10.3], [80.3, 13.5], [81, 16], [82.5, 17], [86.5, 20], [88, 22], [90, 22], [91.8, 22.3], [92.3, 20.7], [94.5, 17.5], [94.3, 16], [97.5, 16.5], [98.5, 13], [98.5, 9.5], [100.2, 6.5], [100.5, 3.5], [101.3, 2.8], [103.4, 1.3], [104.2, 1.5], [103.5, 4], [102.3, 6.1], [101, 6.9], [100.2, 8.5], [99.2, 10.3], [99.5, 13], [100.5, 13.5], [101.5, 12.7], [103, 11], [104.8, 10.4], [105, 8.6], [107, 10.5], [109.2, 12], [108.8, 15.5], [105.8, 18.5], [106.5, 20], [107.5, 21.5], [110, 21], [113.5, 22.3], [117, 23.5], [119.5, 25.5], [121.5, 28], [122, 30.8], [120.8, 32.6], [119.3, 35], [122.5, 37], [118.5, 38.3], [117.7, 39], [119.5, 39.8], [121.5, 41], [124.4, 40], [126, 37.5], [126.5, 34.5], [129.3, 35.2], [129.5, 37], [128.3, 38.6], [129.7, 40.8], [130.7, 42.3], [133, 42.8], [138, 45.8], [140.5, 48.5], [141.3, 52], [140.7, 53.5], [137, 54], [135.2, 54.8], [140, 57.8], [143, 59.3], [148, 59.3], [152, 59], [155, 59.3], [160, 61.5], [170, 60], [177, 62.5], [179.9, 64.8], [179.9, 69], [170, 70], [160, 69.8], [150, 71.5], [140, 72.5], [130, 71], [125, 73.5], [113, 73.8], [110, 76.5], [104, 77.7], [98, 76], [90, 75.5], [80, 73.5], [72, 72.5], [68, 68.5], [60, 69], [55, 68.2], [44, 68.4], [41, 67], [33, 69.3], [28, 71], [23, 70.7], [16, 69], [12, 66], [8.5, 63.3], [5, 62], [5, 59], [6.5, 58], [8, 58.1], [10.5, 59.5], [11.5, 58.5], [12.6, 56.2], [14, 55.4], [16, 56.2], [16.6, 57.8], [18.5, 59.4], [17.2, 61], [17.3, 62.5], [21, 64.5], [22.5, 65.8], [25.4, 65], [25, 64], [21.5, 63], [21.3, 61], [22.5, 60], [27, 60.4], [29.8, 59.9], [28, 59.5], [24, 59.3], [23.5, 58.3], [24.3, 57.2], [21.5, 57.5], [21, 56], [21, 55.3], [19.5, 54.4], [14.5, 54], [10.9, 54.4], [10.3, 56.2], [10.6, 57.7], [8.2, 56.9], [8.6, 55.3], [8.6, 53.9], [7, 53.5], [5, 53.2], [4, 51.5], [1.6, 50.9], [-1.5, 49.7], [-1.9, 48.6], [-4.7, 48.5], [-2.3, 47.2], [-1.2, 46], [-1.5, 43.5], [-4, 43.4], [-8, 43.7]],
+  // Africa
+  [[-17, 21], [-16.5, 24], [-13, 27.5], [-9.8, 29.8], [-9.5, 32.5], [-6.8, 34], [-5.9, 35.8], [-2, 35.1], [3, 36.8], [10, 37.3], [11, 35.5], [10, 34.2], [11, 33.2], [15, 32.3], [20, 31], [20, 32.4], [23, 32.6], [25, 31.6], [29, 30.9], [32.3, 31.3], [32.6, 29.9], [33.6, 27.6], [35.5, 23.8], [37.2, 21], [38.6, 18], [41.7, 13.7], [43.2, 11.5], [44.5, 10.4], [51.2, 11.8], [51, 10.4], [49.8, 7], [47.6, 4.4], [43.8, 0.3], [41.6, -1.7], [39.5, -4.7], [39.3, -8], [40.5, -10.5], [40.6, -15.3], [36.8, -18.5], [35, -20.5], [35.5, -24], [32.8, -25.6], [32.6, -28.6], [30.2, -31.3], [27.5, -33.6], [22.5, -34], [20, -34.8], [18.4, -34], [18, -31.5], [15.3, -27], [14.5, -22.5], [11.8, -17.2], [12.3, -13], [13.7, -10.7], [12.2, -6], [9.2, -1], [9.6, 2.6], [9.5, 4], [8.5, 4.5], [6, 4.3], [4.5, 6.3], [1.5, 6.1], [-2, 4.8], [-4.5, 5.2], [-7.5, 4.4], [-9, 5], [-11.5, 6.9], [-13.3, 8.8], [-15.2, 11], [-16.7, 12.4], [-17.5, 14.7], [-16.2, 19.5]],
+  [[49.3, -12], [50.5, -15.5], [49.6, -17.5], [47.2, -24.8], [45.2, -25.5], [43.6, -23.5], [44, -20], [44.4, -16.3], [47, -15.4]],
+  // Australia, Tasmania, New Zealand
+  [[113.5, -22], [114, -26.5], [115, -30], [115, -34], [118, -35], [123, -34], [126, -32.2], [131, -31.5], [134, -32.8], [136, -35], [137.5, -34], [138.5, -35.5], [140, -38], [144, -38.3], [146.4, -39], [150, -37.5], [151.2, -34], [153, -31], [153.5, -28], [153, -25], [150.8, -22.6], [149, -21], [146, -18.8], [145.3, -15], [144.6, -14.4], [143.7, -14.2], [143.4, -12.5], [142.5, -10.7], [141.6, -12.6], [141.4, -15], [141, -17], [139.2, -17.4], [137, -15.8], [135.4, -15], [136, -13.5], [136.8, -12.2], [135, -12.2], [132.5, -11.3], [130.5, -12.3], [129.8, -13.5], [129.5, -14.9], [128.2, -14.9], [126.8, -13.8], [125.5, -14.2], [124, -15], [122.3, -17.2], [121, -19.5], [117, -20.7], [114.5, -21.8]],
+  [[144.7, -40.7], [148.3, -40.9], [148, -43.2], [146.5, -43.6], [145.2, -42.2]],
+  [[172.7, -34.4], [174.5, -36], [176, -37.6], [178.5, -37.7], [177, -39.3], [175, -41.5], [174.6, -39.5]],
+  [[172.7, -40.5], [174.3, -41.7], [173, -43.5], [171, -44.5], [169, -46.6], [166.5, -46], [168, -44], [171, -42]],
+  // Japan, UK, Ireland, Iceland, Sri Lanka, Taiwan, Cuba, Hispaniola
+  [[130, 31.3], [131.5, 31.5], [132, 33.8], [135, 33.5], [137, 34.5], [139.8, 35], [140.9, 36.9], [141.5, 38.3], [142, 40], [141.5, 41.4], [140, 40.6], [139.8, 38.5], [138.5, 37.5], [136.8, 37], [135.5, 35.7], [133, 35.5], [131, 34.4], [129.8, 33.2]],
+  [[140, 42], [141.5, 42.5], [143.3, 42], [145.5, 43.3], [144, 44.2], [142, 45.4], [141.6, 43.3]],
+  [[-5.7, 50], [1.4, 51.2], [1.7, 52.7], [0.2, 53.5], [-1.6, 55.6], [-2.1, 57.7], [-3.4, 58.6], [-5, 58.6], [-6.2, 56.5], [-4.8, 54.8], [-3, 54], [-4.6, 53.3], [-4.3, 52.2], [-5.2, 51.7], [-3.2, 51.4]],
+  [[-6, 52.2], [-6.2, 54.2], [-7.5, 55.3], [-10, 54.2], [-10.3, 51.8], [-8.5, 51.6]],
+  [[-24, 65.5], [-22, 66.4], [-16, 66.5], [-13.5, 65.2], [-18, 63.4], [-22.5, 63.8]],
+  [[79.8, 6.2], [81.8, 7.2], [80.2, 9.8], [79.8, 8]],
+  [[120.1, 23], [121, 25.2], [122, 25], [120.8, 22]],
+  [[-85, 21.8], [-82, 23.1], [-77.5, 21.8], [-74.2, 20.2], [-77.7, 19.9], [-80, 21.6]],
+  // Antarctica band
+  [[-180, -90], [180, -90], [180, -70], [150, -68], [110, -66], [80, -67], [40, -69], [0, -70], [-40, -77], [-60, -64], [-65, -63], [-75, -71], [-110, -74], [-150, -77], [-180, -75]],
+];
+// islands of the Maritime Continent are shared with the box map (unclipped ones only)
+const SUMATRA_FULL = [[95.3, 5.6], [97.5, 5.2], [100.3, 2.5], [101.5, 2], [103.7, -1], [106, -3], [105.9, -5.8], [104.5, -5.9], [102.3, -4], [101, -2.5], [98.6, 1.7], [96, 4.2]];
+for (const p of BOX_LAND) if (!p.deep && !p.shelf && !["Indochina", "Malaya", "Sumatra", "Hispaniola"].includes(p.name)) WORLD.push(p.pts);
+WORLD.push(SUMATRA_FULL);
+
+function globeTexture() {
+  const tw = 2048, th = 1024, c = document.createElement("canvas"); c.width = tw; c.height = th;
+  const g = c.getContext("2d");
+  const u = lon => (lon + 180) / 360 * tw, v = lat => (90 - lat) / 180 * th;
+  g.fillStyle = "#1f5fa8"; g.fillRect(0, 0, tw, th);
+  // El Niño warm anomaly in the equatorial central/eastern Pacific
+  g.save(); g.translate(u(-125), v(-1)); g.scale(1, 0.16);
+  const grd = g.createRadialGradient(0, 0, 0, 0, 0, u(-75) - u(-125));
+  grd.addColorStop(0, "rgba(240,110,50,0.95)"); grd.addColorStop(0.6, "rgba(246,162,74,0.65)"); grd.addColorStop(1, "rgba(246,162,74,0)");
+  g.fillStyle = grd; g.beginPath(); g.arc(0, 0, u(-75) - u(-125), 0, Math.PI * 2); g.fill(); g.restore();
+  g.fillStyle = "#8cbf6e"; g.strokeStyle = "#5f8f4c"; g.lineWidth = 2.5; g.lineJoin = "round";
+  for (const poly of WORLD) {
+    g.beginPath();
+    poly.forEach(([lon, lat], i) => (i ? g.lineTo(u(lon), v(lat)) : g.moveTo(u(lon), v(lat))));
+    g.closePath(); g.fill(); g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; return tex;
+}
+globe.add(new THREE.Mesh(new THREE.SphereGeometry(R, 72, 48), new THREE.MeshLambertMaterial({ map: globeTexture(), flatShading: true })));
+globe.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.07, 64, 32), new THREE.MeshBasicMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.28, side: THREE.BackSide, depthWrite: false })));
+function globePos(lat, lon, r = R) {
+  const phi = (lon + 180) / 360 * Math.PI * 2, theta = (90 - lat) / 180 * Math.PI;
+  return new THREE.Vector3(-r * Math.cos(phi) * Math.sin(theta), r * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta));
+}
+// impact regions: spherical caps + labelled markers
+const IMPACTS = [
+  { key: "indo", text: "Drier: Indonesia", kind: "dry", lat: -3, lon: 118, caps: [[-2, 110, 6], [-4, 120, 5], [-5, 135, 5]], a: 7.3, off: [-170, -70] },
+  { key: "aus", text: "Drier: eastern Australia", kind: "dry", lat: -24, lon: 145, caps: [[-22, 145, 8], [-30, 148, 5]], a: 8.4, off: [150, 60] },
+  { key: "safr", text: "Drier: southern Africa", kind: "dry", lat: -21, lon: 28, caps: [[-20, 28, 8], [-27, 25, 5]], a: 10.4, off: [-180, 60] },
+  { key: "india", text: "Weaker monsoon: India", kind: "dry", lat: 21, lon: 79, caps: [[21, 79, 7], [16, 77, 5]], a: 12.4, off: [150, -70] },
+  { key: "peru", text: "Heavy rain: Peru & Ecuador", kind: "wet", lat: -4, lon: -80, caps: [[-3, -80, 4], [-7, -79, 3]], a: 14.8, off: [190, 40] },
+  { key: "sus", text: "Wetter winter: southern US", kind: "wet", lat: 31, lon: -95, caps: [[31, -97, 5], [31, -86, 5], [33, -112, 4]], a: 18.2, off: [210, 20] },
+  { key: "can", text: "Milder winter: Canada & northern US", kind: "mild", lat: 53, lon: -105, caps: [[52, -105, 9], [48, -90, 6], [58, -120, 6]], a: 21.5, off: [60, -80] },
+  { key: "atl", text: "Fewer Atlantic hurricanes", kind: "fewer", lat: 16, lon: -50, caps: [[16, -50, 9]], a: 25.1, off: [170, -40] },
+  { key: "epac", text: "More storms: central & eastern Pacific", kind: "storm", lat: 13, lon: -125, caps: [[13, -125, 9]], a: 28.2, off: [-120, -80] },
+];
+const KIND_COLOR = { dry: "#d58a32", wet: "#2fc4d8", mild: "#ff7f6b", fewer: "#c8d2e0", storm: "#8f6cf0" };
+for (const imp of IMPACTS) {
+  imp.meshes = imp.caps.map(([lat, lon, rad]) => {
+    const g = new THREE.SphereGeometry(R * 1.004, 32, 6, 0, Math.PI * 2, 0, rad * Math.PI / 180);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: KIND_COLOR[imp.kind], transparent: true, opacity: 0, depthWrite: false }));
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), globePos(lat, lon, 1));
+    m.renderOrder = 4; globe.add(m); return m;
+  });
+}
+// jet stream (normal -> El Niño position)
+const JET_N = [[35, 135], [41, 155], [47, 175], [51, -160], [53, -140], [50, -122], [45, -105], [41, -90], [42, -75], [45, -55]];
+const JET_E = [[31, 135], [32, 155], [32, 175], [31, -160], [30, -140], [30, -122], [30.5, -105], [31.5, -90], [34, -75], [39, -55]];
+const jetMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false });
+const jetTube = new THREE.Mesh(new THREE.BufferGeometry(), jetMat);
+jetTube.renderOrder = 6; jetTube.frustumCulled = false; globe.add(jetTube);
+const JET_P = 46;
+const jetPts = makePoints(JET_P, 0.8); jetPts.renderOrder = 7; globe.add(jetPts);
+let jetCurve = null;
+function buildJet(shift) {
+  const pts = JET_N.map(([la, lo], i) => {
+    const [la2, lo2] = JET_E[i];
+    return globePos(lerp(la, la2, shift), lerp(lo, lo2, shift), R + 2.4);
+  });
+  jetCurve = new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
+  jetTube.geometry.dispose();
+  jetTube.geometry = new THREE.TubeGeometry(jetCurve, 140, 0.32 + 0.22 * shift, 6, false);
+}
+
+/* ============================================================== overlay (HTML labels, cards, diagrams) */
+const overlay = document.getElementById("overlay");
+const leaders = document.getElementById("leaders");
+const SVGNS = "http://www.w3.org/2000/svg";
+const ICON = {
+  dry: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="6.5" fill="#f2a12e"/><g stroke="#f2a12e" stroke-width="2.6" stroke-linecap="round"><path d="M16 2.5v4M16 25.5v4M2.5 16h4M25.5 16h4M6.4 6.4l2.8 2.8M22.8 22.8l2.8 2.8M6.4 25.6l2.8-2.8M22.8 9.2l2.8-2.8"/></g></svg>`,
+  wet: `<svg viewBox="0 0 32 32"><path d="M16 3C12 10 7.5 15 7.5 20a8.5 8.5 0 0 0 17 0C24.5 15 20 10 16 3z" fill="#22a9d6"/></svg>`,
+  mild: `<svg viewBox="0 0 32 32"><rect x="13" y="3" width="6" height="18" rx="3" fill="none" stroke="#ff6f59" stroke-width="2.6"/><circle cx="16" cy="24" r="5.5" fill="#ff6f59"/><rect x="14.6" y="11" width="2.8" height="12" fill="#ff6f59"/></svg>`,
+  storm: `<svg viewBox="0 0 32 32"><path d="M16 16m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0M16 4c-6 0-10 3-11 7 3-2 6-2.5 9-1.5M16 28c6 0 10-3 11-7-3 2-6 2.5-9 1.5" fill="none" stroke="#7b55e8" stroke-width="2.8" stroke-linecap="round"/></svg>`,
+  fewer: `<svg viewBox="0 0 32 32"><path d="M16 16m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0M16 4c-6 0-10 3-11 7 3-2 6-2.5 9-1.5M16 28c6 0 10-3 11-7-3 2-6 2.5-9 1.5" fill="none" stroke="#8a97a8" stroke-width="2.8" stroke-linecap="round"/><path d="M5 27L27 5" stroke="#e0522b" stroke-width="3" stroke-linecap="round"/></svg>`,
+};
+const timed = [];
+function timedEl(cls, html, a, b, opts = {}) {
+  const d = document.createElement("div"); d.className = cls; d.innerHTML = html;
+  if (opts.style) Object.assign(d.style, opts.style);
+  overlay.appendChild(d);
+  const item = { el: d, a, b, fi: opts.fi ?? 0.5, fo: opts.fo ?? 0.5, slide: opts.slide ?? true, base: opts.base ?? "" };
+  timed.push(item); return item;
+}
+const labels = [];
+/** label anchored to a 3D point; anchor(st) returns a world-space Vector3 (or null). */
+function label(text, anchor, a, b, off = [0, -80], cls = "", opts = {}) {
+  const el = document.createElement("div"); el.className = `label ${cls}`; el.innerHTML = text; overlay.appendChild(el);
+  const line = document.createElementNS(SVGNS, "line"); line.setAttribute("stroke", "#0f2a44"); line.setAttribute("stroke-width", "2.5");
+  line.setAttribute("stroke-linecap", "round");
+  const dot = document.createElementNS(SVGNS, "circle"); dot.setAttribute("r", "6"); dot.setAttribute("fill", "#ffffff");
+  dot.setAttribute("stroke", "#0f2a44"); dot.setAttribute("stroke-width", "2.5");
+  leaders.appendChild(line); leaders.appendChild(dot);
+  const item = { el, line, dot, anchor, a, b, off, fi: opts.fi ?? 0.5, fo: opts.fo ?? 0.5, facing: opts.facing ?? null };
+  labels.push(item); return item;
+}
+const defCard = (term, text, a, b, style) => timedEl("card def", `<b>${term}</b>${text}`, a, b, { style });
+const V = (x, y, z) => () => new THREE.Vector3(x, y, z);
+
+// ---- chapter chips
+const CHAPTER = { s02: "1 · Normal conditions", s03: "1 · Normal conditions", s04: "2 · The Bjerknes feedback", s05: "3 · The trigger",
+  s06: "4 · Peak El Niño", s07: "5 · Global effects", s08: "6 · Decay and La Niña", s09: "6 · The ENSO cycle", s10: "Recap" };
+for (const [id, text] of Object.entries(CHAPTER)) timedEl("chip", text, S[id].start + 0.3, S[id].end - (id === "s10" ? 5.2 : 0.15), { fi: 0.6, fo: 0.4, slide: false });
+
+// ---- s01 title
+timedEl("title", `<h1>How El Niño Forms</h1><p>The Pacific Ocean's most famous climate rhythm</p>`, at("s01", 0.8), at("s01", 16.2), { fi: 1.2, fo: 1.0 });
+
+// ---- s02 labels
+label("Indonesia", () => new THREE.Vector3(bx(114), LAND_H, bz(-1)), at("s02", 3.0), at("s02", 10.3), [-60, -90]);
+label("Australia", () => new THREE.Vector3(bx(133), LAND_H, bz(-13)), at("s02", 3.6), at("s02", 10.3), [-150, -20]);
+label("South America", () => new THREE.Vector3(bx(-72), LAND_H, bz(-6)), at("s02", 7.9), at("s02", 14.0), [-20, -110]);
+label("Trade winds", V(6, 1.6, -3.2), at("s02", 10.6), at("s02", 22.5), [0, -100]);
+defCard("Trade winds", "Steady winds of the tropics, blowing from east to west", at("s02", 10.6), at("s02", 17.5));
+label("Warm pool", V(-46, 0.3, -1), at("s02", 19.1), at("s02", 41.6), [-40, 120], "warm");
+label("Rising air &amp; rain", V(-40, 12.5, -1.2), at("s02", 23.2), at("s02", 41.6), [-200, -50]);
+label("Sinking, dry air", V(36.5, 9.0, -1), at("s02", 31.0), at("s02", 41.6), [190, -40]);
+label("Walker circulation", V(-2, 13.8, -1), at("s02", 34.3), at("s02", 41.6), [0, -80]);
+
+// ---- s03 labels (equatorial cross-section)
+const thermoAt = (x) => st => new THREE.Vector3(x, -thermoDepth(x, 0, st), FRONT + 0.05);
+label("Warm upper layer", V(-28, -2.6, FRONT), at("s03", 2.9), at("s03", 13.6), [-120, -110], "warm");
+label("Cold, deep water", V(-4, -11.2, FRONT), at("s03", 4.6), at("s03", 13.6), [0, 70], "cold");
+label("Thermocline", thermoAt(4), at("s03", 6.6), at("s03", 15.4), [70, -110]);
+label("Thermocline tilts", thermoAt(4), at("s03", 25.8), at("s03", 28.2), [70, -110]);
+defCard("Thermocline", "The boundary between warm surface water and cold deep water, where temperature drops fast", at("s03", 6.6), at("s03", 13.6));
+label("~150 m deep", thermoAt(-46), at("s03", 17.0), at("s03", 27.8), [10, -120], "small");
+label("A few tens of meters", thermoAt(42), at("s03", 22.0), at("s03", 27.8), [-60, -120], "small");
+timedEl("note", "Not to scale: ocean depth hugely exaggerated", at("s03", 3.0), at("s03", 28.0));
+label("Upwelling", V(43, -3.2, FRONT + 0.2), at("s03", 36.4), at("s03", 49.6), [-150, -120], "cold");
+defCard("Upwelling", "Cold, nutrient-rich water rising up from below", at("s03", 36.4), at("s03", 42.2));
+label("Cold tongue", V(18, 0.3, 0.6), at("s03", 42.6), at("s03", 49.6), [-40, -110], "cold");
+
+// ---- s04 / s06 feedback diagrams
+function feedbackSVG(title, sub, n0, n1, n2, a2label) {
+  const node = (id, x, y, lines, color) => `<g id="${id}"><rect x="${x - 135}" y="${y - 52}" width="270" height="104" rx="18" fill="${color}"/>` +
+    lines.map((l, i) => `<text x="${x}" y="${y + (i - (lines.length - 1) / 2) * 34 + 11}" text-anchor="middle" font-size="27" font-weight="700" fill="#fff">${l}</text>`).join("") + `</g>`;
+  const arrow = (id, d) => `<g id="${id}"><path d="${d}" fill="none" stroke="#0f2a44" stroke-width="7" stroke-linecap="round" stroke-dasharray="14 12" marker-end="url(#ah)"/></g>`;
+  return `<svg viewBox="0 0 640 540" width="640" height="540">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0f2a44"/></marker></defs>
+    <rect x="0" y="0" width="640" height="540" rx="22" fill="rgba(255,255,255,0.92)"/>
+    <text x="320" y="52" text-anchor="middle" font-size="34" font-weight="800" fill="#0f2a44">${title}</text>
+    <text x="320" y="86" text-anchor="middle" font-size="22" font-weight="600" fill="#3c5674">${sub}</text>
+    ${arrow("a0", "M 462 182 Q 560 225 520 330")}
+    ${arrow("a1", "M 405 462 Q 320 520 235 462")}
+    ${arrow("a2", "M 120 330 Q 80 225 178 182")}
+    <text x="60" y="262" font-size="20" font-weight="700" fill="#3c5674" text-anchor="middle" transform="rotate(-72 60 262)">${a2label}</text>
+    ${node("n0", 320, 175, n0, "#2f6fb5")}
+    ${node("n1", 478, 405, n1, "#2a8fb8")}
+    ${node("n2", 162, 405, n2, "#d0582f")}
+  </svg>`;
+}
+const fb1 = timedEl("card diagram", feedbackSVG("The Bjerknes feedback", "A self-reinforcing loop", ["Strong", "trade winds"], ["Upwelling", "cools the east"], ["Big east–west", "temp. difference"], "via air pressure"),
+  at("s04", 0.6), at("s04", 36.4), { fi: 0.7, fo: 0.6 });
+const fb2 = timedEl("card diagram", feedbackSVG("The feedback in reverse", "Now it amplifies warming", ["Weaker", "trade winds"], ["Less upwelling,", "warmer east"], ["Smaller", "temp. difference"], "via air pressure"),
+  at("s06", 0.4), at("s06", 12.2), { fi: 0.6, fo: 0.6 });
+const FB_STEPS = {
+  fb1: { item: fb1, on: { n0: at("s04", 8.6), a0: at("s04", 9.6), n1: at("s04", 10.4), a1: at("s04", 12.8), n2: at("s04", 13.6), a2: at("s04", 18.1) }, spin: at("s04", 21.5) },
+  fb2: { item: fb2, on: { n1: at("s06", 3.2), a1: at("s06", 4.0), n2: at("s06", 4.8), a2: at("s06", 6.7), n0: at("s06", 7.4), a0: at("s06", 9.0) }, spin: at("s06", 9.6) },
+};
+for (const f of Object.values(FB_STEPS)) f.parts = Object.fromEntries(Object.keys(f.on).map(k => [k, f.item.el.querySelector(`#${k}`)]));
+label("Stronger winds", V(6, 1.6, -3.2), at("s04", 21.5), at("s04", 29.4), [-420, -60], "small");
+label("More upwelling", V(44, -2.5, FRONT + 0.2), at("s04", 24.3), at("s04", 33.0), [-430, 80], "small cold");
+
+// ---- s05 labels
+label("Trade winds weaken", V(10, 1.6, -3.2), at("s05", 2.5), at("s05", 10.8), [60, -100]);
+label("Westerly wind burst", st => new THREE.Vector3(-26, 1.8, 0.4), at("s05", 4.0), at("s05", 11.0), [-120, 90], "small");
+defCard("Westerly wind", "Wind blowing from the west: the opposite of the trade winds", at("s05", 7.2), at("s05", 11.0));
+label("Kelvin wave", st => { const w = st.waves.find(q => q.kind === "kelvin"); return w ? new THREE.Vector3(w.x, 0.6, FRONT) : null; },
+  at("s05", 15.9), at("s05", 28.4), [0, -120], "warm");
+defCard("Kelvin wave", "A slow, broad bulge of warm water that travels east along the equator", at("s05", 15.9), at("s05", 21.6));
+timedEl("card def", "<b>Crossing time</b>About 2 months to cross the Pacific", at("s05", 24.7), at("s05", 28.4));
+label("Thermocline deepens in the east", thermoAt(38), at("s05", 28.6), at("s05", 32.6), [-120, -150]);
+label("Upwelled water is now warm", V(44, -1.5, FRONT + 0.2), at("s05", 33.0), at("s05", 40.6), [-260, -90], "warm small");
+
+// ---- s06 labels (basin part)
+label("Warm water spreads east", V(16, 0.4, 0.5), at("s06", 12.5), at("s06", 17.4), [0, -110], "warm");
+label("Rain moves toward the central Pacific", V(-9, 12.5, -0.6), at("s06", 17.0), at("s06", 25.2), [0, -70]);
+label("Walker circulation weakens", st => new THREE.Vector3((st.xR + st.xS) / 2, 13.8, -1), at("s06", 21.9), at("s06", 25.2), [260, 40], "small");
+// globe part of s06
+label("Jet stream", () => (jetCurve ? globe.localToWorld(jetCurve.getPoint(0.5).clone()) : null), at("s06", 26.4), at("s06", 44.0), [0, -90]);
+defCard("Jet stream", "A fast river of air about 10 km above the ground", at("s06", 26.1), at("s06", 31.0));
+label("Storm track shifts south", () => globe.localToWorld(globePos(30, -112, R + 0.3)), at("s06", 34.9), at("s06", 44.0), [40, 110], "small",
+  { facing: () => globePos(30, -112, 1) });
+timedEl("card def", "<b>Peak season</b>El Niño usually peaks around November to January", at("s06", 37.8), at("s06", 44.0));
+
+// ---- s07 globe impacts
+defCard("Teleconnections", "Links between weather in faraway places", at("s07", 0.5), at("s07", 6.8));
+for (const imp of IMPACTS) {
+  imp.label = label(`${ICON[imp.kind]}${imp.text}`, () => globe.localToWorld(globePos(imp.lat, imp.lon, R + 0.2)),
+    at("s07", imp.a), at("s07", 33.0), imp.off, "small", { facing: () => globePos(imp.lat, imp.lon, 1) });
+}
+timedEl("card temp", `<div class="n">+0.1 to 0.2 °C</div><div class="s">Typical boost to global average temperature during and after El Niño</div>`,
+  at("s07", 33.2), at("s07", 41.6), { base: "translateX(-50%)" });
+timedEl("card big", `<h2>Tendencies, not guarantees</h2><p>Every El Niño is different</p>`, at("s07", 42.0), at("s07", 49.6), { base: "translateX(-50%)" });
+
+// ---- s08 labels
+label("Rossby waves travel west", st => { const w = st.waves.find(q => q.kind === "rossby"); return w ? new THREE.Vector3(w.x, 0.4, w.z) : null; },
+  at("s08", 7.1), at("s08", 10.4), [0, -110], "cold");
+defCard("Rossby wave", "A slow ocean wave that travels west, away from the equator's centre line", at("s08", 7.1), at("s08", 11.6));
+label("Reflected wave lifts the thermocline", st => { const w = st.waves.find(q => q.kind === "up"); return w ? new THREE.Vector3(w.x, -thermoDepth(w.x, 0, st), FRONT + 0.05) : null; },
+  at("s08", 10.4), at("s08", 17.0), [0, -150], "cold");
+timedEl("card def", "<b>Meanwhile</b>El Niño drains heat away from the equator", at("s08", 16.7), at("s08", 21.2));
+label("Trade winds recover", V(8, 1.6, -3.2), at("s08", 21.4), at("s08", 25.6), [0, -100]);
+timedEl("card big", `<h2 style="color:#1f5fa8">La Niña</h2><p>Stronger trade winds · colder eastern Pacific · roughly opposite weather</p>`,
+  at("s08", 25.7), at("s08", 39.6), { base: "translateX(-50%)" });
+
+// ---- s09 ENSO chart + cards
+const ENSO_EVENTS = [[0.3, -1.6, 0.5], [1.6, 0.9, 0.45], [3.4, -1.0, 0.5], [5.0, 1.2, 0.45], [8.6, 2.2, 0.5], [9.9, -1.5, 0.5], [11.0, -0.9, 0.45],
+  [13.5, 1.1, 0.45], [16.2, 1.9, 0.5], [17.4, -1.3, 0.5], [19.6, 0.8, 0.45]];
+const ensoIndex = y => ENSO_EVENTS.reduce((s, [c, a, w]) => s + a * gauss(y - c, w), 0) + 0.12 * Math.sin(2.1 * y) * Math.sin(0.7 * y + 1);
+const CH = { x0: 110, x1: 1400, yMid: 188, ys: 46, years: 20 };
+const chx = y => CH.x0 + (CH.x1 - CH.x0) * y / CH.years, chy = v => CH.yMid - v * CH.ys;
+function chartSVG() {
+  let line = "", warm = "", cold = "";
+  for (let i = 0; i <= 400; i++) {
+    const y = i / 400 * CH.years, v = ensoIndex(y);
+    line += `${i ? "L" : "M"}${chx(y).toFixed(1)} ${chy(v).toFixed(1)} `;
+    warm += `${i ? "L" : "M"}${chx(y).toFixed(1)} ${chy(Math.max(v, 0.5)).toFixed(1)} `;
+    cold += `${i ? "L" : "M"}${chx(y).toFixed(1)} ${chy(Math.min(v, -0.5)).toFixed(1)} `;
+  }
+  warm += `L${chx(CH.years)} ${chy(0.5)} L${chx(0)} ${chy(0.5)} Z`;
+  cold += `L${chx(CH.years)} ${chy(-0.5)} L${chx(0)} ${chy(-0.5)} Z`;
+  let ticks = "";
+  for (let y = 0; y <= 20; y += 2) ticks += `<line x1="${chx(y)}" y1="${chy(-2.6)}" x2="${chx(y)}" y2="${chy(-2.75)}" stroke="#3c5674" stroke-width="2"/><text x="${chx(y)}" y="${chy(-2.75) + 26}" font-size="20" text-anchor="middle" fill="#3c5674" font-weight="600">${y}</text>`;
+  return `<svg viewBox="0 0 1440 360" width="1440" height="360">
+    <defs><clipPath id="reveal"><rect id="revealRect" x="0" y="0" width="0" height="360"/></clipPath></defs>
+    <rect x="0" y="0" width="1440" height="360" rx="22" fill="rgba(255,255,255,0.92)"/>
+    <text x="40" y="44" font-size="28" font-weight="800" fill="#0f2a44">ENSO index</text>
+    <text x="210" y="44" font-size="21" font-weight="600" fill="#3c5674">(schematic, illustrative only: not real data)</text>
+    <text x="${chx(0) - 18}" y="${chy(-2.75) + 26}" font-size="20" font-weight="700" fill="#3c5674" text-anchor="end">Year</text>
+    <line x1="${chx(0)}" y1="${chy(0)}" x2="${chx(20)}" y2="${chy(0)}" stroke="#9fb1c6" stroke-width="2"/>
+    <line x1="${chx(0)}" y1="${chy(0.5)}" x2="${chx(20)}" y2="${chy(0.5)}" stroke="#e0522b" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.6"/>
+    <line x1="${chx(0)}" y1="${chy(-0.5)}" x2="${chx(20)}" y2="${chy(-0.5)}" stroke="#2f7fc8" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.6"/>
+    <text x="${chx(0) - 14}" y="${chy(1.4)}" font-size="21" font-weight="800" fill="#e0522b" text-anchor="end">El Niño</text>
+    <text x="${chx(0) - 14}" y="${chy(-1.3)}" font-size="21" font-weight="800" fill="#2f7fc8" text-anchor="end">La Niña</text>
+    ${ticks}
+    <g clip-path="url(#reveal)">
+      <path d="${warm}" fill="#f08a4b" opacity="0.85"/><path d="${cold}" fill="#5aa3e0" opacity="0.85"/>
+      <path d="${line}" fill="none" stroke="#0f2a44" stroke-width="3.5" stroke-linejoin="round"/>
+    </g>
+    <circle id="cursorDot" cx="${chx(0)}" cy="${chy(ensoIndex(0))}" r="9" fill="#0f2a44" stroke="#fff" stroke-width="3"/>
+    <g id="gapNote" opacity="0"><text x="${chx(10.6)}" y="${chy(2.1)}" font-size="22" font-weight="800" fill="#0f2a44" text-anchor="middle">~2 to 7 years between El Niños</text></g>
+    <g id="lenNote" opacity="0"><text x="${chx(16.2)}" y="${chy(-2.25)}" font-size="22" font-weight="800" fill="#0f2a44" text-anchor="middle">each lasts ~9 to 12 months</text></g>
+  </svg>`;
+}
+const chart = timedEl("card chart", chartSVG(), at("s09", 0.6), at("s09", 25.6), { fi: 0.7, fo: 0.6, slide: false });
+const chartParts = { rect: chart.el.querySelector("#revealRect"), dot: chart.el.querySelector("#cursorDot"),
+  gap: chart.el.querySelector("#gapNote"), len: chart.el.querySelector("#lenNote") };
+const CHART_A = at("s09", 1.0), CHART_B = at("s09", 25.0);
+const chartYear = t => CH.years * clamp((t - CHART_A) / (CHART_B - CHART_A));
+timedEl("card def", "<b>Southern Oscillation</b>An east–west see-saw in air pressure across the tropical Pacific", at("s09", 5.6), at("s09", 12.0), { style: { top: "420px" } });
+timedEl("card big", `<h2>Climate change</h2><p>Doesn't create El Niño, but can make its impacts hit harder.<br>How ENSO itself will change is still being researched.</p>`,
+  at("s09", 26.0), at("s09", 40.6), { base: "translateX(-50%)" });
+
+// ---- s10 recap + end card
+const recap = timedEl("card recap", `<h3>Recap</h3><ol><li id="r0">Trade winds weaken</li><li id="r1">Warm water sloshes east</li><li id="r2">Rain follows the warm water</li><li id="r3">Weather shifts worldwide</li></ol>`,
+  at("s10", 0.4), at("s10", 12.0));
+const recapItems = [0, 1, 2, 3].map(i => recap.el.querySelector(`#r${i}`));
+const RECAP_ON = [at("s10", 1.2), at("s10", 2.9), at("s10", 4.4), at("s10", 5.9)];
+timedEl("end", `<h1>How El Niño Forms</h1><p>El Niño and La Niña: the El Niño–Southern Oscillation (ENSO)</p>`, at("s10", 12.3), TOTAL + 10, { fi: 1.0, slide: false });
+
+/* ============================================================== state of the world at time t */
+const eTrack = track([[0, 0], [at("s01", 1.5), 0], [at("s01", 6.5), 0.85], [at("s01", 15.5), 0.85], [at("s01", 20), 0],
+  [at("s05", 27.5), 0], [at("s05", 38), 0.55], [at("s06", 3), 0.6], [at("s06", 16), 1.0],
+  [at("s08", 7), 1.0], [at("s08", 22), 0], [at("s08", 26), 0], [at("s08", 33), -1], [at("s09", 0), -1],
+  [at("s10", 0), 0], [at("s10", 1.5), 0], [at("s10", 7), 1], [TOTAL, 1]]);
+const windTrack = track([[0, 1], [at("s01", 1.5), 1], [at("s01", 6.5), 0.3], [at("s01", 15.5), 0.3], [at("s01", 20), 1],
+  [at("s04", 20.5), 1], [at("s04", 22.5), 1.35], [at("s04", 28), 1.35], [at("s04", 31), 1],
+  [at("s05", 2.5), 1], [at("s05", 7), 0.35], [at("s06", 3), 0.35], [at("s06", 11), 0.12],
+  [at("s08", 20.5), 0.12], [at("s08", 24.5), 1.0], [at("s08", 27), 1.0], [at("s08", 32), 1.5], [at("s09", 0), 1.5],
+  [at("s10", 0), 1], [at("s10", 0.5), 1], [at("s10", 3), 0.2], [TOTAL, 0.2]]);
+const windVis = track([[0, 1], [at("s01", 18), 1], [at("s01", 21), 0], [at("s02", 10.5), 0], [at("s02", 12.5), 1]]);
+const cloudVis = track([[0, 1], [at("s01", 18), 1], [at("s01", 21), 0], [at("s02", 23), 0], [at("s02", 25), 1]]);
+const walkerVis = track([[0, 0], [at("s02", 28.5), 0], [at("s02", 30.5), 1], [at("s03", 0.5), 1], [at("s03", 2.5), 0],
+  [at("s06", 19.5), 0], [at("s06", 21.5), 1], [at("s06", 26), 1], [at("s08", 0), 0], [at("s08", 20.5), 0], [at("s08", 23), 1],
+  [at("s09", 0.5), 1], [at("s09", 2.5), 0]]);
+const upVis = track([[0, 0], [at("s03", 28.5), 0], [at("s03", 30.5), 1], [at("s09", 0), 1], [at("s09", 2), 0]]);
+const surfOp = track([[0, 1], [at("s03", 0.8), 1], [at("s03", 3), 0.3], [at("s03", 40.5), 0.3], [at("s03", 43), 1],
+  [at("s05", 10.5), 1], [at("s05", 12.5), 0.45], [at("s05", 32), 0.45], [at("s05", 35), 1],
+  [at("s08", 0), 0.45], [at("s08", 19), 0.45], [at("s08", 21.5), 1]]);
+const jetShift = track([[0, 0], [at("s06", 30.5), 0], [at("s06", 34.5), 1]]);
+const GLOBE_A = at("s06", 25.4), GLOBE_B = at("s08", 0);
+const CUTS = [GLOBE_A, GLOBE_B];
+const globeLon = track([[GLOBE_A, -150], [at("s06", 44), -132], [at("s07", 0), -150], [at("s07", 6.5), -160],
+  [at("s07", 9.2), -235], [at("s07", 11.4), -235], [at("s07", 13.4), -305], [at("s07", 14.2), -305], [at("s07", 16.2), -440],
+  [at("s07", 17.6), -440], [at("s07", 19.6), -460], [at("s07", 24.4), -460], [at("s07", 26.6), -445], [at("s07", 33), -445],
+  [at("s07", 50), -520]]);
+const globeLat = track([[GLOBE_A, 34], [at("s06", 44), 31], [at("s07", 0), 12], [at("s07", 6.5), 10],
+  [at("s07", 9.2), -10], [at("s07", 11.4), -10], [at("s07", 13.4), -2], [at("s07", 14.2), -2], [at("s07", 16.2), 4],
+  [at("s07", 17.6), 4], [at("s07", 19.6), 30], [at("s07", 24.4), 30], [at("s07", 26.6), 18], [at("s07", 33), 18], [at("s07", 50), 6]]);
+
+const windInt = integral(t => windTrack(t));
+const walkStrength = t => { const e = eTrack(t); return e >= 0 ? 1 - 0.5 * e : 1 + 0.3 * -e; };
+const walkInt = integral(walkStrength);
+
+function stateAt(t) {
+  const st = { t, e: eTrack(t), wind: windTrack(t), windVis: windVis(t), cloudVis: cloudVis(t), walkerVis: walkerVis(t),
+    upVis: upVis(t), surfOp: surfOp(t), waves: [], globe: t >= GLOBE_A && t < GLOBE_B };
+  // s09: the basin follows the schematic ENSO index under the chart cursor
+  if (inScene("s09", t)) {
+    const local = t - S.s09.start, eChart = clamp(ensoIndex(chartYear(t)) / 2.0, -1, 1);
+    st.e = lerp(-1, eChart, smooth(0, 1.5, local));
+    st.e = lerp(st.e, 0, smooth(25.5, 29.5, local));
+    st.wind = st.e >= 0 ? 1 - 0.85 * st.e : 1 + 0.5 * -st.e;
+    st.wind = lerp(1.5, st.wind, smooth(0, 1.5, local));
+  }
+  // ocean waves (thermocline bumps). dh>0 pushes the thermocline down.
+  const kA = win(t, at("s05", 11.2), at("s05", 30.5), 1.5, 2.0);
+  if (kA > 0) st.waves.push({ kind: "kelvin", x: lerp(-44, 47, clamp((t - at("s05", 11.5)) / 16)), z: 0, wx: 6.5, wz: 4.0, dh: 3.0 * kA, dy: 0.5 * kA, dT: 0.9 * kA });
+  const rA = win(t, at("s08", 2.4), at("s08", 10.6), 1.0, 1.0);
+  if (rA > 0) {
+    const xr = lerp(28, -50, clamp((t - at("s08", 2.6)) / 7.6));
+    st.waves.push({ kind: "rossby", x: xr, z: -4.6, wx: 7, wz: 2.6, dh: -2.2 * rA, dy: -0.25 * rA, dT: -0.4 * rA });
+    st.waves.push({ kind: "rossby2", x: xr, z: 4.6, wx: 7, wz: 2.6, dh: -2.2 * rA, dy: -0.25 * rA, dT: -0.4 * rA });
+  }
+  const uA = win(t, at("s08", 9.8), at("s08", 18.5), 1.0, 1.5);
+  if (uA > 0) st.waves.push({ kind: "up", x: lerp(-50, 47, clamp((t - at("s08", 10)) / 7.2)), z: 0, wx: 6.5, wz: 4.0, dh: -2.4 * uA, dy: -0.3 * uA, dT: -0.6 * uA });
+  st.burst = win(t, at("s05", 3.0), at("s05", 11.5), 1.2, 1.5);
+  const e = st.e;
+  st.xR = e >= 0 ? lerp(-40, -6, e) : lerp(-40, -44, -e);
+  st.xS = e >= 0 ? lerp(36, 47, e) : 38;
+  st.walk = walkStrength(t);
+  st.cW = (e >= 0 ? 1 - 0.9 * e : 1 + 0.25 * -e) * st.cloudVis;
+  st.cC = Math.max(0, e) * st.cloudVis;
+  st.jetVis = win(t, at("s06", 26.0), at("s07", 3.5), 1.0, 1.0);
+  st.jetShift = jetShift(t);
+  return st;
+}
+
+/* ============================================================== camera keyframes */
+// [absolute time, position, look-at target, fov]. Two keys at (almost) the same time = hard cut.
+const CAM = [];
+const ck = (id, local, p, l, fov = 38) => CAM.push([at(id, local), p, l, fov]);
+ck("s01", 0, [-24, 26, 165], [-48, 62, -150], 40); ck("s01", 1.2, [-24, 26, 165], [-48, 62, -150], 40);
+ck("s01", 9, [0, 60, 112], [0, -2, -2], 38); ck("s01", 23, [0, 52, 100], [0, -2, -2], 38);
+ck("s02", 2.5, [0, 47, 92], [0, -2, -2]); ck("s02", 9.8, [0, 47, 92], [0, -2, -2]);
+ck("s02", 11.5, [4, 40, 86], [0, 0, -2]); ck("s02", 18.6, [4, 40, 86], [0, 0, -2]);
+ck("s02", 21.2, [-36, 27, 60], [-38, 1, -2], 40); ck("s02", 27.8, [-32, 27, 64], [-35, 4, -2], 40);
+ck("s02", 31.2, [0, 17, 106], [0, 5, -2], 40); ck("s02", 42, [0, 17, 106], [0, 5, -2], 40);
+ck("s03", 0.4, [0, 17, 106], [0, 5, -2], 40); ck("s03", 3.6, [0, 1.5, 76], [0, -6, 9], 40); ck("s03", 13.6, [0, 1.5, 76], [0, -6, 9], 40);
+ck("s03", 16.2, [-30, -0.5, 52], [-32, -6, 9], 40); ck("s03", 19.6, [-30, -0.5, 52], [-32, -6, 9], 40);
+ck("s03", 22.4, [30, -0.5, 52], [32, -5, 9], 40); ck("s03", 25.2, [30, -0.5, 52], [32, -5, 9], 40);
+ck("s03", 27.4, [0, 2, 78], [0, -6, 9], 40); ck("s03", 30.4, [32, 6, 46], [39, -3, 6], 40); ck("s03", 40.6, [34, 6, 48], [39, -3, 6], 40);
+ck("s03", 44, [22, 42, 66], [14, -1, -1], 40); ck("s03", 50, [20, 44, 68], [14, -1, -1], 40);
+ck("s04", 3.2, [36, 66, 146], [36, -3, -2], 38); ck("s04", 37, [34, 64, 142], [34, -3, -2], 38);
+ck("s05", 3, [-6, 42, 90], [-10, 0, -2], 38); ck("s05", 10.6, [-6, 42, 90], [-10, 0, -2], 38);
+ck("s05", 12.6, [-36, 4, 60], [-36, -5, 9], 40); ck("s05", 27.4, [38, 4, 60], [40, -5, 9], 40);
+ck("s05", 29.8, [33, 3, 47], [39, -5, 8], 40); ck("s05", 32.4, [33, 3, 47], [39, -5, 8], 40);
+ck("s05", 36, [22, 40, 72], [18, 0, -2], 40); ck("s05", 41, [20, 42, 74], [18, 0, -2], 40);
+ck("s06", 3, [36, 66, 146], [36, -2, -2], 38); ck("s06", 12, [36, 66, 146], [36, -2, -2], 38);
+ck("s06", 15, [-4, 25, 102], [-4, 5, -2], 40); ck("s06", 25.4, [-4, 25, 102], [-4, 5, -2], 40);
+ck("s06", 25.401, [0, 10, 122], [0, 2, 0], 36); ck("s06", 44, [0, 10, 114], [0, 2, 0], 36);
+ck("s07", 0, [0, 2, 126], [0, 1, 0], 36); ck("s07", 6.5, [0, 2, 118], [0, 1, 0], 36); ck("s07", 9.2, [0, 0, 100], [0, 0, 0], 36);
+ck("s07", 31.5, [0, 0, 100], [0, 0, 0], 36); ck("s07", 35.5, [0, 0, 136], [0, 10, 0], 36); ck("s07", 50, [0, 0, 130], [0, 9, 0], 36);
+ck("s08", 0, [0, 46, 74], [0, -4, 0], 40); ck("s08", 9.0, [0, 46, 74], [0, -4, 0], 40);
+ck("s08", 10.8, [-24, 8, 64], [-24, -6, 9], 40); ck("s08", 17.0, [30, 8, 64], [30, -5, 9], 40);
+ck("s08", 21, [0, 50, 96], [0, -2, -2]); ck("s08", 25, [0, 50, 96], [0, -2, -2]); ck("s08", 28.5, [16, 42, 84], [8, -2, -2]); ck("s08", 40, [14, 42, 84], [8, -2, -2]);
+ck("s09", 3, [0, 64, 104], [0, 11, -6]); ck("s09", 25, [0, 64, 104], [0, 11, -6]); ck("s09", 28, [0, 54, 100], [0, 1, -3]); ck("s09", 41, [0, 54, 100], [0, 1, -3]);
+ck("s10", 0, [-32, 46, 92], [0, -2, -2]); ck("s10", 12, [30, 46, 92], [0, -2, -2]); ck("s10", 17, [34, 48, 94], [0, -2, -2]);
+CAM.sort((a, b) => a[0] - b[0]);
+const _p = new THREE.Vector3(), _l = new THREE.Vector3();
+function cameraAt(t) {
+  let i = 0;
+  while (i < CAM.length - 1 && CAM[i + 1][0] <= t) i++;
+  const k0 = CAM[i], k1 = CAM[Math.min(i + 1, CAM.length - 1)];
+  const span = k1[0] - k0[0];
+  const k = span > 1e-6 && t > k0[0] ? ease(clamp((t - k0[0]) / span)) : 0;
+  _p.set(lerp(k0[1][0], k1[1][0], k), lerp(k0[1][1], k1[1][1], k), lerp(k0[1][2], k1[1][2], k));
+  _l.set(lerp(k0[2][0], k1[2][0], k), lerp(k0[2][1], k1[2][1], k), lerp(k0[2][2], k1[2][2], k));
+  camera.position.copy(_p); camera.lookAt(_l);
+  camera.fov = lerp(k0[3], k1[3], k); camera.updateProjectionMatrix();
+}
+
+/* ============================================================== per-frame update */
+const tmpC = new THREE.Color(), tmpC2 = new THREE.Color(), tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpS = new THREE.Vector3(), tmpV = new THREE.Vector3();
+const Q_WEST = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+const Q_EAST = new THREE.Quaternion();
+const DEEP_TOP = C("#2350a8"), DEEP_BOT = C("#0a1f4f");
+const HIDE = new THREE.Matrix4().makeScale(0, 0, 0);
+
+function updateBasin(t, st) {
+  // ocean surface + thermocline surface
+  const sp = surfGeo.attributes.position.array, sc = surfGeo.attributes.color.array;
+  const tp = thermoGeo.attributes.position.array, tc = thermoGeo.attributes.color.array;
+  let n = 0;
+  for (let j = 0; j <= NZ; j++) {
+    const z = (ZN + INSET) + (j / NZ) * (BD);
+    for (let i = 0; i <= NX; i++, n++) {
+      const x = (X0 + INSET) + (i / NX) * BW;
+      sp[n * 3] = x; sp[n * 3 + 1] = surfaceY(x, z, t, st); sp[n * 3 + 2] = z;
+      ramp(SST_STOPS, sst(x, z, st), tmpC);
+      sc[n * 3] = tmpC.r; sc[n * 3 + 1] = tmpC.g; sc[n * 3 + 2] = tmpC.b;
+      const h = thermoDepth(x, z, st);
+      tp[n * 3] = x; tp[n * 3 + 1] = -h; tp[n * 3 + 2] = z;
+      ramp(DEPTH_STOPS, h, tmpC);
+      tc[n * 3] = tmpC.r; tc[n * 3 + 1] = tmpC.g; tc[n * 3 + 2] = tmpC.b;
+    }
+  }
+  surfGeo.attributes.position.needsUpdate = surfGeo.attributes.color.needsUpdate = true;
+  thermoGeo.attributes.position.needsUpdate = thermoGeo.attributes.color.needsUpdate = true;
+  surfMat.opacity = st.surfOp;
+  surfMat.depthWrite = st.surfOp > 0.99;
+
+  // equatorial cross-section + thermocline ribbon
+  const fp = faceGeo.attributes.position.array, fc = faceGeo.attributes.color.array;
+  const rp = ribbonGeo.attributes.position.array, rc = ribbonGeo.attributes.color.array;
+  n = 0;
+  const hx = new Float32Array(NX + 1), tx = new Float32Array(NX + 1);
+  for (let i = 0; i <= NX; i++) { const x = (X0 + INSET) + (i / NX) * BW; hx[i] = thermoDepth(x, 0, st); tx[i] = sst(x, 0, st); }
+  for (let j = 0; j <= NY; j++) {
+    const d = (j / NY) * DEPTH;
+    for (let i = 0; i <= NX; i++, n++) {
+      const x = (X0 + INSET) + (i / NX) * BW, h = hx[i];
+      fp[n * 3] = x; fp[n * 3 + 1] = j === 0 ? surfaceY(x, FRONT, t, st) : -d; fp[n * 3 + 2] = FRONT;
+      ramp(SST_STOPS, tx[i] - 2.2 * (d / Math.max(h, 0.5)), tmpC);
+      tmpC2.lerpColors(DEEP_TOP, DEEP_BOT, clamp((d - h) / Math.max(DEPTH - h, 1)));
+      tmpC.lerp(tmpC2, smooth(h - 0.45, h + 0.45, d));
+      fc[n * 3] = tmpC.r; fc[n * 3 + 1] = tmpC.g; fc[n * 3 + 2] = tmpC.b;
+    }
+  }
+  faceGeo.attributes.position.needsUpdate = faceGeo.attributes.color.needsUpdate = true;
+  n = 0;
+  for (let j = 0; j <= 1; j++) for (let i = 0; i <= NX; i++, n++) {
+    const x = (X0 + INSET) + (i / NX) * BW;
+    rp[n * 3] = x; rp[n * 3 + 1] = -hx[i] + (j ? -0.13 : 0.13); rp[n * 3 + 2] = FRONT + 0.03;
+    rc[n * 3] = rc[n * 3 + 1] = rc[n * 3 + 2] = 1;
+  }
+  ribbonGeo.attributes.position.needsUpdate = true;
+
+  // trade-wind arrows (move with the integrated wind, so speed changes never jump)
+  const off = windInt(t) * 3.2;
+  const L = 2.6 * (0.3 + 0.7 * Math.min(Math.abs(st.wind), 1.6));
+  let k = 0;
+  for (let r = 0; r < ROWS.length; r++) for (let c = 0; c < COLS; c++, k++) {
+    const z = ROWS[r], lat = latOfZ(z);
+    const x = SPAN_E - fract((c * SPAN / COLS + off + r * 4.1) / SPAN) * SPAN;
+    const edge = smooth(SPAN_W, SPAN_W + 7, x) * (1 - smooth(Math.min(SPAN_E, coastX(lat) - 3) - 6, Math.min(SPAN_E, coastX(lat) - 3), x));
+    const s = st.windVis * edge;
+    if (s < 0.01) { trade.setMatrixAt(k, HIDE); continue; }
+    tmpS.set(L * s, s, s);
+    tmpM.compose(tmpV.set(x, 1.6 + 0.08 * Math.sin(t * 2 + k), z), Q_WEST, tmpS);
+    trade.setMatrixAt(k, tmpM);
+  }
+  trade.instanceMatrix.needsUpdate = true;
+  // westerly wind burst arrows
+  for (let i = 0; i < burst.count; i++) {
+    const x = -46 + fract(i / burst.count * 3 + t * 0.09) * 34, z = -2.6 + (i % 3) * 2.6 + (i % 2) * 0.6;
+    const s = st.burst * smooth(-46, -41, x) * (1 - smooth(-17, -12, x));
+    if (s < 0.01) { burst.setMatrixAt(i, HIDE); continue; }
+    tmpM.compose(tmpV.set(x, 1.9, z), Q_EAST, tmpS.set(2.4 * s, s, s));
+    burst.setMatrixAt(i, tmpM);
+  }
+  burst.instanceMatrix.needsUpdate = true;
+
+  // Walker circulation
+  if (st.walkerVis > 0.01) {
+    const curve = walkerCurve(st.xR, st.xS);
+    walkerTube.geometry.dispose();
+    walkerTube.geometry = new THREE.TubeGeometry(curve, 160, 0.3, 6, true);
+    walkerMat.opacity = 0.42 * st.walkerVis * (0.5 + 0.5 * st.walk);
+    walkerTube.visible = true;
+    const ph = walkInt(t) * 0.05;
+    for (let i = 0; i < CHEV; i++) {
+      const u = fract(i / CHEV + ph);
+      const p = curve.getPointAt(u), tan = curve.getTangentAt(u);
+      tmpQ.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tan);
+      const s = st.walkerVis * (0.55 + 0.45 * Math.min(st.walk, 1.2));
+      tmpM.compose(p, tmpQ, tmpS.set(s, s, s));
+      chevrons.setMatrixAt(i, tmpM);
+    }
+  } else {
+    walkerTube.visible = false;
+    for (let i = 0; i < CHEV; i++) chevrons.setMatrixAt(i, HIDE);
+  }
+  chevrons.instanceMatrix.needsUpdate = true;
+
+  // clouds + rain
+  const rpos = rainGeo.attributes.position.array;
+  let pi = 0, ri = 0;
+  for (const tw of towerDefs) {
+    const inten = tw.c === 0 ? st.cW : st.cC;
+    const grow = clamp(inten * TOWERS * 1.05 - tw.k * 0.9, 0, 1);
+    const g = smooth(0, 1, grow);
+    for (const pf of tw.puffs) {
+      if (g < 0.02) { cloudMesh.setMatrixAt(pi++, HIDE); continue; }
+      const y = 4.6 + pf.f * (tw.height - 4.6) * g;
+      const s = pf.s * g * (1 + 0.06 * Math.sin(t * 0.8 + tw.seed + pf.f * 3)) * (pf.f > 0.7 ? 1.25 : 1);
+      tmpM.compose(tmpV.set(tw.x + pf.dx * g, y, tw.z + pf.dz), tmpQ.set(0, 0, 0, 1), tmpS.set(s * 1.25, s * 0.9, s));
+      cloudMesh.setMatrixAt(pi++, tmpM);
+    }
+    for (let q = 0; q < RAIN_PER; q++, ri++) {
+      const rd = rainDefs[ri];
+      if (g < 0.35) { for (let m = 0; m < 6; m++) rpos[ri * 6 + m] = 0; continue; }
+      const top = 4.2, y0 = top - fract(rd.ph + t * 1.7) * top;
+      const x = tw.x + rd.dx, z = tw.z + rd.dz;
+      rpos[ri * 6] = x; rpos[ri * 6 + 1] = y0; rpos[ri * 6 + 2] = z;
+      rpos[ri * 6 + 3] = x - 0.12; rpos[ri * 6 + 4] = Math.max(0.05, y0 - 1.1); rpos[ri * 6 + 5] = z;
+    }
+  }
+  cloudMesh.instanceMatrix.needsUpdate = true;
+  rainGeo.attributes.position.needsUpdate = true;
+
+  // upwelling particles on the cross-section
+  const warmth = clamp(st.e, 0, 1), strength = clamp(st.wind, 0.25, 1.4);
+  const up = upPts.geometry.attributes, upP = up.position.array, upC = up.aColor.array, upA = up.aAlpha.array;
+  tmpC.lerpColors(COLD_P, WARM_P, warmth);
+  for (let i = 0; i < UP_N; i++) {
+    const d = upDefs[i], p = fract(d.ph + windInt(t) * 0.045 * d.sp);
+    const h = thermoDepth(d.x0, 0, st), d0 = h + 1.8;
+    const pe = 1 - (1 - p) * (1 - p);
+    upP[i * 3] = d.x0 - 7 * p * p; upP[i * 3 + 1] = -lerp(d0, 0.25, pe); upP[i * 3 + 2] = FRONT + 0.22;
+    upC[i * 3] = tmpC.r; upC[i * 3 + 1] = tmpC.g; upC[i * 3 + 2] = tmpC.b;
+    upA[i] = st.upVis * strength * smooth(0, 0.12, p) * (1 - smooth(0.85, 1, p)) * 0.95;
+  }
+  up.position.needsUpdate = up.aColor.needsUpdate = up.aAlpha.needsUpdate = true;
+  const sp2 = spreadPts.geometry.attributes, s2P = sp2.position.array, s2C = sp2.aColor.array, s2A = sp2.aAlpha.array;
+  for (let i = 0; i < SPREAD_N; i++) {
+    const d = spreadDefs[i], p = fract(d.ph + windInt(t) * 0.03 * d.sp);
+    const z = bz(d.lat) + d.dz, x = coastX(d.lat) - 1.2 - 26 * p * (0.5 + 0.5 * gauss(d.lat + 1, 6));
+    s2P[i * 3] = x; s2P[i * 3 + 1] = 0.22; s2P[i * 3 + 2] = Math.min(z, FRONT - 0.2);
+    s2C[i * 3] = tmpC.r; s2C[i * 3 + 1] = tmpC.g; s2C[i * 3 + 2] = tmpC.b;
+    s2A[i] = st.upVis * strength * smooth(0, 0.08, p) * (1 - smooth(0.6, 1, p)) * 0.8;
+  }
+  sp2.position.needsUpdate = sp2.aColor.needsUpdate = sp2.aAlpha.needsUpdate = true;
+}
+
+function updateGlobe(t, st) {
+  globe.rotation.set(THREE.MathUtils.degToRad(globeLat(t)), -THREE.MathUtils.degToRad(globeLon(t) + 90), 0);
+  for (const imp of IMPACTS) {
+    const a = at("s07", imp.a);
+    const op = smooth(a - 0.2, a + 0.6, t) * (1 - 0.45 * smooth(at("s07", 32.6), at("s07", 33.6), t)) * (inScene("s07", t) ? 1 : 0);
+    for (const m of imp.meshes) { m.material.opacity = 0.62 * op; m.visible = op > 0.005; }
+  }
+  if (st.jetVis > 0.005) {
+    buildJet(st.jetShift);
+    jetMat.opacity = 0.75 * st.jetVis; jetTube.visible = true; jetPts.visible = true;
+    const a = jetPts.geometry.attributes, P = a.position.array, Cc = a.aColor.array, A = a.aAlpha.array;
+    for (let i = 0; i < JET_P; i++) {
+      const u = fract(i / JET_P + t * (0.08 + 0.05 * st.jetShift)), p = jetCurve.getPointAt(u);
+      P[i * 3] = p.x; P[i * 3 + 1] = p.y; P[i * 3 + 2] = p.z;
+      Cc[i * 3] = 1; Cc[i * 3 + 1] = 1; Cc[i * 3 + 2] = 1;
+      A[i] = st.jetVis * smooth(0, 0.06, u) * (1 - smooth(0.94, 1, u));
+    }
+    a.position.needsUpdate = a.aColor.needsUpdate = a.aAlpha.needsUpdate = true;
+  } else { jetTube.visible = false; jetPts.visible = false; }
+}
+
+const camDir = new THREE.Vector3(), worldN = new THREE.Vector3();
+function updateOverlay(t, st) {
+  for (const it of timed) {
+    const op = win(t, it.a, it.b, it.fi, it.fo);
+    it.el.style.opacity = op.toFixed(3);
+    it.el.style.visibility = op > 0.002 ? "visible" : "hidden";
+    if (it.slide) it.el.style.transform = `${it.base} translateY(${((1 - op) * 14).toFixed(2)}px)`;
+  }
+  // feedback diagrams
+  for (const f of Object.values(FB_STEPS)) {
+    for (const [k, el] of Object.entries(f.parts)) {
+      const on = smooth(f.on[k], f.on[k] + 0.6, t);
+      el.style.opacity = (0.22 + 0.78 * on).toFixed(3);
+      const path = el.querySelector("path");
+      if (path && k.startsWith("a")) path.setAttribute("stroke-dashoffset", (-(t - f.on[k]) * 40 * smooth(f.spin - 1, f.spin, t)).toFixed(1));
+    }
+  }
+  // ENSO chart
+  const yr = chartYear(t);
+  chartParts.rect.setAttribute("width", chx(yr).toFixed(1));
+  chartParts.dot.setAttribute("cx", chx(yr).toFixed(1)); chartParts.dot.setAttribute("cy", chy(ensoIndex(yr)).toFixed(1));
+  chartParts.gap.setAttribute("opacity", win(t, at("s09", 18.4), at("s09", 25.4), 0.5, 0.4).toFixed(3));
+  chartParts.len.setAttribute("opacity", win(t, at("s09", 21.6), at("s09", 25.4), 0.5, 0.4).toFixed(3));
+  recapItems.forEach((li, i) => { li.style.opacity = (0.15 + 0.85 * smooth(RECAP_ON[i], RECAP_ON[i] + 0.5, t)).toFixed(3); });
+
+  // 3D-anchored labels
+  camera.getWorldDirection(camDir);
+  for (const lb of labels) {
+    let op = win(t, lb.a, lb.b, lb.fi, lb.fo);
+    let p = null;
+    if (op > 0.002) p = lb.anchor(st);
+    if (p && lb.facing) {
+      worldN.copy(lb.facing()).applyQuaternion(globe.quaternion);
+      op *= smooth(0.05, 0.3, -worldN.dot(camDir));
+    }
+    if (!p || op <= 0.002) { lb.el.style.visibility = "hidden"; lb.line.setAttribute("opacity", "0"); lb.dot.setAttribute("opacity", "0"); continue; }
+    const v = p.clone().project(camera);
+    if (v.z > 1) { lb.el.style.visibility = "hidden"; lb.line.setAttribute("opacity", "0"); lb.dot.setAttribute("opacity", "0"); continue; }
+    const ax = (v.x + 1) / 2 * W, ay = (1 - v.y) / 2 * H;
+    const lx = ax + lb.off[0], ly = ay + lb.off[1] + (1 - op) * 10;
+    lb.el.style.visibility = "visible"; lb.el.style.opacity = op.toFixed(3);
+    lb.el.style.transform = `translate(${lx.toFixed(1)}px, ${ly.toFixed(1)}px) translate(-50%, -50%)`;
+    lb.line.setAttribute("x1", ax.toFixed(1)); lb.line.setAttribute("y1", ay.toFixed(1));
+    lb.line.setAttribute("x2", lx.toFixed(1)); lb.line.setAttribute("y2", ly.toFixed(1));
+    lb.line.setAttribute("opacity", (op * 0.85).toFixed(3));
+    lb.dot.setAttribute("cx", ax.toFixed(1)); lb.dot.setAttribute("cy", ay.toFixed(1)); lb.dot.setAttribute("opacity", op.toFixed(3));
+  }
+  // fades: opening, cuts to/from the globe, final fade-out
+  let f = 1 - smooth(0, 0.9, t);
+  for (const c of CUTS) f = Math.max(f, 1 - smooth(0, 0.6, Math.abs(t - c)));
+  f = Math.max(f, smooth(TOTAL - 0.9, TOTAL - 0.1, t));
+  document.getElementById("fade").style.opacity = f.toFixed(3);
+}
+
+function renderAt(t) {
+  t = clamp(t, 0, TOTAL - 1e-4);
+  const st = stateAt(t);
+  basin.visible = !st.globe; globe.visible = st.globe;
+  cameraAt(t);
+  if (!st.globe) updateBasin(t, st); else updateGlobe(t, st);
+  scene.updateMatrixWorld();
+  updateOverlay(t, st);
+  renderer.render(scene, camera);
+  return t;
+}
+
+/* ============================================================== entry points */
+window.TOTAL_SECONDS = TOTAL;
+window.renderAt = renderAt;
+await document.fonts.ready;
+await Promise.all([400, 600, 700, 800].map(w => document.fonts.load(`${w} 20px InterV`)));
+renderAt(params.has("t") ? parseFloat(params.get("t")) : 0);
+window.__ready = true;
+
+if (PREVIEW) {
+  const stage = document.getElementById("stage"), controls = document.getElementById("controls");
+  controls.style.display = "flex";
+  const fit = () => { const s = Math.min(innerWidth / W, (innerHeight - 50) / H); stage.style.transform = `scale(${s})`; };
+  addEventListener("resize", fit); fit();
+  const scrub = document.getElementById("scrub"), clock = document.getElementById("clock"), btn = document.getElementById("play");
+  scrub.max = TOTAL;
+  const audios = CFG.scenes.map(s => { const a = new Audio(`/audio/${s.id}.wav`); a.preload = "auto"; return a; });
+  let playing = false, t0 = 0, wall0 = 0, cur = 0, curScene = -1;
+  const sceneIndex = t => CFG.scenes.findIndex(s => t >= S[s.id].start && t < S[s.id].end);
+  const syncAudio = t => {
+    const i = sceneIndex(t);
+    if (i !== curScene) { audios.forEach(a => a.pause()); curScene = i; if (playing && i >= 0) { audios[i].currentTime = t - S[CFG.scenes[i].id].start; audios[i].play().catch(() => {}); } }
+  };
+  const show = t => { cur = t; renderAt(t); scrub.value = t; clock.textContent = `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`; };
+  scrub.addEventListener("input", () => { playing = false; btn.textContent = "Play"; audios.forEach(a => a.pause()); curScene = -1; show(parseFloat(scrub.value)); });
+  btn.addEventListener("click", () => { playing = !playing; btn.textContent = playing ? "Pause" : "Play"; t0 = cur; wall0 = performance.now(); curScene = -1; if (!playing) audios.forEach(a => a.pause()); });
+  const loop = () => { if (playing) { const t = t0 + (performance.now() - wall0) / 1000; if (t >= TOTAL) { playing = false; btn.textContent = "Play"; } show(Math.min(t, TOTAL)); syncAudio(t); } requestAnimationFrame(loop); };
+  show(params.has("t") ? parseFloat(params.get("t")) : 0);
+  loop();
+}
+</script>
+</body>
+</html>

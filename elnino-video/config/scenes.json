@@ -1,0 +1,95 @@
+{
+  "title": "How El Niño Forms",
+  "video": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "audio": {
+    "sample_rate": 48000,
+    "lead_in_s": 0.5,
+    "pause_s": 0.8,
+    "min_tail_s": 0.5
+  },
+  "tts": {
+    "edge": {
+      "voice": "en-US-AriaNeural",
+      "rate": "-6%",
+      "pitch": "+0Hz",
+      "volume": "+0%"
+    },
+    "piper": {
+      "voice": "en_US-lessac-medium",
+      "length_scale": 1.25,
+      "sentence_silence": 0.25
+    }
+  },
+  "pronunciations": {
+    "Bjerknes": "Byerk-ness",
+    "ENSO": "Enso",
+    "El Niño–Southern Oscillation": "El Niño, Southern Oscillation",
+    "US": "U.S."
+  },
+  "scenes": [
+    {
+      "id": "s01",
+      "title": "Cold open",
+      "duration": 23,
+      "narration": "Every few years, a huge stretch of the tropical Pacific Ocean turns unusually warm, and weather around the world shifts with it. Peruvian fishermen noticed this warm water arriving around Christmas, and named it El Niño: the boy child. [PAUSE] So how does El Niño form? Let's build it, piece by piece."
+    },
+    {
+      "id": "s02",
+      "title": "Normal conditions: trade winds and the Walker circulation",
+      "duration": 42,
+      "narration": "Let's start with normal conditions. Picture the Pacific along the equator: Indonesia and Australia on the left, South America on the right. [PAUSE] Near the surface, the trade winds, the steady winds of the tropics, blow from east to west. They push warm surface water west, piling it into a deep warm pool near Indonesia. [PAUSE] Above the warm pool, moist air rises, builds towering storm clouds, and rains. High up, that air flows back east and sinks over the cool eastern Pacific, where skies stay dry. This giant loop is called the Walker circulation."
+    },
+    {
+      "id": "s03",
+      "title": "Normal conditions: thermocline, upwelling and the cold tongue",
+      "duration": 50,
+      "narration": "Now let's look beneath the surface. A warm upper layer of ocean floats on cold, deep water. The boundary between them is the thermocline: a thin zone where temperature drops quickly with depth. [PAUSE] Because the winds pile warm water in the west, the thermocline there sits deep, about 150 meters down. In the east, it's only a few tens of meters deep. So the thermocline tilts. [PAUSE] Off South America, the winds, helped by Earth's rotation, push surface water away from the coast and the equator. Cold water rises from below to replace it. This is upwelling. It feeds rich fisheries, and creates a strip of cool water along the equator called the cold tongue."
+    },
+    {
+      "id": "s04",
+      "title": "The Bjerknes feedback",
+      "duration": 37,
+      "narration": "These pieces reinforce one another, in what's called the Bjerknes feedback, after the meteorologist Jacob Bjerknes. [PAUSE] Strong trade winds drive upwelling, which keeps the east cold. A cold east and a warm west make a big temperature difference across the ocean. That difference creates an air-pressure difference, which drives the trade winds even harder. Stronger winds mean more upwelling, and the loop goes around again. [PAUSE] A loop like this can hold the Pacific steady. But it can also run in reverse."
+    },
+    {
+      "id": "s05",
+      "title": "The trigger: weaker trade winds and Kelvin waves",
+      "duration": 41,
+      "narration": "That's how an El Niño begins. The trade winds weaken, sometimes helped by bursts of westerly wind, which blow from the west for days or weeks. [PAUSE] With less wind holding it back, the piled-up warm water sloshes east. It travels as a Kelvin wave: a broad, slow bulge that rides along the equator, pushing the thermocline down by tens of meters. It crosses the Pacific in about two months. [PAUSE] In the east, the thermocline deepens and the tilt flattens. Upwelling now brings up warm water instead of cold, so the surface heats up."
+    },
+    {
+      "id": "s06",
+      "title": "Peak El Niño",
+      "duration": 44,
+      "narration": "Now the Bjerknes feedback runs in reverse. A warmer east means a smaller temperature difference, which weakens the winds further, which lets even more warm water spread east. [PAUSE] Warm water now covers much of the central and eastern Pacific. The rising air and heavy rain follow it, moving away from Indonesia. The Walker circulation weakens and shifts east. [PAUSE] It even disturbs the jet stream, a fast river of air high above us. In winter, the jet often strengthens and dips south, steering storms toward the southern US. El Niño usually peaks between November and January."
+    },
+    {
+      "id": "s07",
+      "title": "Global effects",
+      "duration": 50,
+      "narration": "These changes ripple around the world through teleconnections: links between weather in faraway places. [PAUSE] El Niño often brings drought to Indonesia, Australia, and southern Africa, and a weaker monsoon to India. Peru and Ecuador can see heavy rain and floods. The southern US tends to have a wetter winter, while Canada and the northern US are often milder. Atlantic hurricanes are usually suppressed, while more storms form in the central and eastern Pacific. [PAUSE] As the ocean releases heat, the global average temperature often rises by about 0.1 to 0.2 degrees Celsius. But these are tendencies, not guarantees. Every El Niño is different."
+    },
+    {
+      "id": "s08",
+      "title": "Decay and La Niña",
+      "duration": 40,
+      "narration": "El Niño doesn't last forever. While Kelvin waves carry warm water east, slower ocean waves, called Rossby waves, travel west. They bounce off the western edge of the Pacific and return east, gradually lifting the thermocline. Meanwhile, El Niño drains heat away from the equator. [PAUSE] The trade winds recover, upwelling returns, and the east cools. Sometimes the system overshoots into La Niña, El Niño's counterpart: stronger trade winds, an unusually cold eastern Pacific, and weather that is often roughly the reverse of El Niño's."
+    },
+    {
+      "id": "s09",
+      "title": "The ENSO cycle",
+      "duration": 41,
+      "narration": "Together, El Niño and La Niña form ENSO, the El Niño–Southern Oscillation. The Southern Oscillation is the matching see-saw in air pressure across the Pacific. [PAUSE] It's a natural, irregular cycle, and corals show it has existed for thousands of years. El Niño returns roughly every 2 to 7 years, and each event usually lasts about 9 to 12 months. [PAUSE] Climate change didn't create El Niño. But on a warmer planet, its impacts, like heat waves and heavy rain, can hit harder. How ENSO itself will change is still being researched."
+    },
+    {
+      "id": "s10",
+      "title": "Recap",
+      "duration": 17,
+      "narration": "So, to recap: the trade winds weaken, warm water sloshes east, the rain follows, and the whole planet feels it. [PAUSE] Next time you hear that El Niño is on the way, you'll know what's happening out in the Pacific."
+    }
+  ]
+}

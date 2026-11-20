@@ -1,0 +1,8 @@
+node_modules/
+frames/
+renders/
+output/
+voices/
+audio/
+.venv/
+__pycache__/
