@@ -179,7 +179,7 @@ ffmpeg -hide_banner -y \
 * H.264 High, 1920x1080, 30 fps, yuv420p
 * AAC 48 kHz stereo, loudness-normalized to −16 LUFS
 * subtitles burned in, plus a soft `mov_text` track
-* about 140–180 MB
+* about 90 MB (the reference build was 90,056,798 bytes)
 
 ## Determinism (how re-renders stay identical)
 
