@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 cfg = json.loads((ROOT / "config" / "scenes.json").read_text("utf-8"))
 tpath = ROOT / "audio" / "timings.json"
-timings = json.loads(tpath.read_text("utf-8")) if tpath.exists() else {}
+timings = json.loads(tpath.read_text("utf-8")).get("scenes", {}) if tpath.exists() else {}
 
 
 def tc(sec: float) -> str:
@@ -28,28 +28,29 @@ lines = [
     "",
     "_Generated from `config/scenes.json` by `tools/make_script_doc.py`; edit the JSON, not this file._",
     "",
-    "- Voice: Phonon 31M `{ph}` (fallbacks: edge-tts `{voice}` at `{rate}`, then Piper `{pv}`)".format(
+    "- Voice: Phonon 31M `{ph}`, words-per-minute measured while talking (fallbacks: edge-tts `{voice}` at `{rate}`, then Piper `{pv}`)".format(
         ph=cfg["tts"]["phonon"]["voice"], voice=cfg["tts"]["edge"]["voice"], rate=cfg["tts"]["edge"]["rate"],
         pv=cfg["tts"]["piper"]["voice"]),
     f"- `[PAUSE]` = {cfg['audio']['pause_s']} s of silence so the visuals can breathe; "
-    f"each scene starts with {cfg['audio']['lead_in_s']} s of silence.",
-    "- Scene slots are fixed: audio is padded to the slot, so the picture never depends on speaking speed.",
+    f"sentences are {cfg['tts']['phonon']['sentence_silence']} s apart; speech is sped up {cfg['audio'].get('tempo', 1.0)}x (pitch kept).",
+    "- Scene lengths come from the audio (`audio/timings.json`); every animation is keyed to the words.",
     "",
 ]
 start = 0.0
 tot_words = tot_speech = 0.0
 for i, s in enumerate(cfg["scenes"], 1):
-    end = start + s["duration"]
+    slot = timings[s["id"]]["slot"] if s["id"] in timings else 0.0
+    end = start + slot
     words = len(s["narration"].replace("[PAUSE]", " ").split())
     tot_words += words
     meta = f"{words} words"
     if s["id"] in timings:
         segs = timings[s["id"]]["segments"]
-        speech = sum(g["end"] - g["start"] for g in segs)
+        speech = sum(x["end"] - x["start"] for g in segs for x in g["sentences"])
         tot_speech += speech
         meta += f" · speech {speech:.1f} s · {words / speech * 60:.0f} wpm · ends at {tc(start + timings[s['id']]['speech_end'])}"
     lines += [f"## Scene {i} ({s['id']}) — {s['title']}", "",
-              f"**{tc(start)} – {tc(end)}** ({s['duration']} s) · {meta}", "",
+              f"**{tc(start)} – {tc(end)}** ({slot:.1f} s) · {meta}", "",
               s["narration"].replace("[PAUSE]", "**[PAUSE]**"), ""]
     start = end
 lines += ["---", "", f"**Total: {tc(start)} ({start:.0f} s), {int(tot_words)} words"

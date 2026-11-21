@@ -2,10 +2,9 @@
 """
 tools/build_srt.py -- Build subtitles/elnino.srt from config/scenes.json.
 
-If audio/timings.json exists (written by tools/tts.py), cue times follow the real
-speech segments of the generated audio. Each [PAUSE]-delimited segment is split into
-readable cues (max 2 lines x 42 characters) and the segment's duration is shared
-between its cues in proportion to their character count.
+If audio/timings.json exists (written by tools/tts.py), every cue starts and ends with the
+real spoken sentence. Long sentences are split into readable cues (max 2 lines x 42
+characters) and the sentence's duration is shared between them by character count.
 
 If audio/timings.json does not exist, times are estimated at --wpm words per minute,
 with the same lead-in and pause lengths tools/tts.py uses.
@@ -107,62 +106,65 @@ def ts(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
-def estimate_segments(scene: dict, audio: dict, wpm: float) -> list[dict]:
-    t = float(audio["lead_in_s"])
-    out = []
+def estimate_scene(scene: dict, audio: dict, wpm: float) -> dict:
+    t = float(scene.get("lead_in_s", audio["lead_in_s"]))
+    segs = []
     for text in segments_of(scene["narration"]):
-        dur = len(text.split()) / wpm * 60.0
-        out.append({"start": t, "end": t + dur, "text": text})
-        t += dur + float(audio["pause_s"])
-    return out
+        sents = []
+        for sent in re.split(r"(?<=[.!?])\s+", text):
+            d = len(sent.split()) / wpm * 60.0
+            sents.append({"start": t, "end": t + d, "text": sent})
+            t += d + 0.12
+        segs.append({"sentences": sents})
+        t += float(audio["pause_s"])
+    return {"segments": segs, "slot": t + float(scene.get("tail_s", audio["tail_s"]))}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--estimate", action="store_true", help="ignore audio/timings.json")
-    ap.add_argument("--wpm", type=float, default=148.0)
+    ap.add_argument("--wpm", type=float, default=175.0)
     ap.add_argument("--out", default=str(DEFAULT_OUT))
     args = ap.parse_args()
 
     cfg = json.loads(CONFIG.read_text("utf-8"))
-    timings = {}
+    timeline = {}
     if TIMINGS.exists() and not args.estimate:
-        timings = json.loads(TIMINGS.read_text("utf-8"))
-        print(f"Using measured timings from {TIMINGS.relative_to(ROOT)}")
+        timeline = json.loads(TIMINGS.read_text("utf-8")).get("scenes", {})
+        print(f"Using measured sentence timings from {TIMINGS.relative_to(ROOT)}")
     else:
         print(f"Estimating timings at {args.wpm:.0f} wpm")
 
     entries = []
     scene_start = 0.0
     for scene in cfg["scenes"]:
-        if scene["id"] in timings:
-            segs = timings[scene["id"]]["segments"]
-            if len(segs) != len(segments_of(scene["narration"])):
-                print(f"ERROR: {scene['id']} narration changed since audio was generated; "
-                      f"re-run tools/tts.py", file=sys.stderr)
-                return 1
-        else:
-            segs = estimate_segments(scene, cfg["audio"], args.wpm)
-        for seg in segs:
-            cues = cues_for_segment(seg["text"])
-            total_chars = sum(len(c) for c in cues)
-            seg_dur = float(seg["end"]) - float(seg["start"])
-            t = scene_start + float(seg["start"])
-            for c in cues:
-                d = seg_dur * len(c) / total_chars
-                entries.append((t, t + d, wrap(c)))
-                t += d
-        scene_start += float(scene["duration"])
+        t = timeline.get(scene["id"]) or estimate_scene(scene, cfg["audio"], args.wpm)
+        if len(t["segments"]) != len(segments_of(scene["narration"])):
+            print(f"ERROR: {scene['id']} narration changed since audio was generated; re-run tools/tts.py",
+                  file=sys.stderr)
+            return 1
+        for seg in t["segments"]:
+            for sent in seg["sentences"]:
+                cues = cues_for_segment(sent["text"])          # long sentences -> several cues
+                total_chars = sum(len(c) for c in cues)
+                a = scene_start + float(sent["start"])
+                dur = float(sent["end"]) - float(sent["start"])
+                for c in cues:
+                    d = dur * len(c) / total_chars
+                    entries.append((a, a + d, wrap(c)))
+                    a += d
+        scene_start += float(t["slot"])
 
-    # small gap between consecutive cues so players never show two at once
     lines = []
     for i, (a, b, text) in enumerate(entries, start=1):
-        end = b - 0.04 if i < len(entries) and entries[i][0] - b < 0.04 else b
+        # hold each cue until the next one starts (max 0.6 s extra), never overlapping
+        nxt = entries[i][0] if i < len(entries) else b + 0.6
+        end = min(max(b, a + 0.8), nxt - 0.04, b + 0.6)
         lines.append(f"{i}\n{ts(a)} --> {ts(end)}\n{text}\n")
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines), encoding="utf-8")
-    print(f"Wrote {len(entries)} cues to {out} (video length {scene_start:.0f}s)")
+    print(f"Wrote {len(entries)} cues to {out} (video length {scene_start:.2f}s)")
     return 0
 
 

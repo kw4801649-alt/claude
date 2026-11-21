@@ -26,7 +26,11 @@ const flag = name => args.includes(`--${name}`);
 
 const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, "config", "scenes.json"), "utf8"));
 const { width: W, height: H, fps: FPS } = cfg.video;
-const TOTAL = cfg.scenes.reduce((s, x) => s + x.duration, 0);
+// The timeline (scene lengths, sentence times) comes from the narration: audio/timings.json
+const TIMINGS = path.join(ROOT, "audio", "timings.json");
+if (!fs.existsSync(TIMINGS)) { console.error("audio/timings.json missing: run `python tools/tts.py` first."); process.exit(1); }
+const TL = JSON.parse(fs.readFileSync(TIMINGS, "utf8"));
+const TOTAL = TL.total;
 const FRAME_COUNT = Math.round(TOTAL * FPS);
 const FORMAT = opt("format", "png");
 const EXT = FORMAT === "jpeg" ? "jpg" : "png";
@@ -82,15 +86,11 @@ const server = await startServer(0);
 const port = server.address().port;
 
 if (flag("test")) {
-  // one still per storyboard beat (absolute seconds)
-  const starts = {}; let acc = 0;
-  for (const s of cfg.scenes) { starts[s.id] = acc; acc += s.duration; }
-  const beats = [["s01", 0.6], ["s01", 4], ["s01", 12], ["s02", 5], ["s02", 15], ["s02", 25], ["s02", 37], ["s03", 10], ["s03", 18], ["s03", 23],
-    ["s03", 33], ["s03", 46], ["s04", 15], ["s04", 27], ["s05", 6], ["s05", 18], ["s05", 30], ["s05", 38], ["s06", 8], ["s06", 20],
-    ["s06", 36], ["s07", 3], ["s07", 10], ["s07", 13], ["s07", 20], ["s07", 30], ["s07", 38], ["s08", 6], ["s08", 13], ["s08", 32],
-    ["s09", 10], ["s09", 22], ["s09", 33], ["s10", 6], ["s10", 15]];
+  // stills at 15%, 50% and 85% of every scene, or at --times a,b,c (absolute seconds)
+  const beats = [];
+  for (const s of cfg.scenes) for (const f of [0.15, 0.5, 0.85]) { const sc = TL.scenes[s.id]; beats.push([`${s.id}_${Math.round(f * 100)}`, sc.start + f * sc.slot]); }
   const times = (opt("times", "") || "").split(",").filter(Boolean).map(Number);
-  const list = times.length ? times.map(t => [`t${t}`, t]) : beats.map(([id, l]) => [`${id}_${String(l).replace(".", "p")}`, starts[id] + l]);
+  const list = times.length ? times.map(t => [`t${t}`, t]) : beats;
   const { browser, page } = await openPage(port);
   for (const [name, t] of list) {
     const file = path.join(OUT, `${name}.${EXT}`);
