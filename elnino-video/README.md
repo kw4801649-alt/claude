@@ -137,7 +137,7 @@ ffmpeg -y -framerate 30 -start_number 0 -i frames/f_%05d.png \
   -i subtitles/elnino.srt \
   -filter_complex "[1:a][2:a][3:a][4:a][5:a][6:a][7:a][8:a][9:a][10:a]concat=n=10:v=0:a=1,loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout];[0:v]format=yuv420p[vout]" \
   -map "[vout]" -map "[aout]" -map 11:s \
-  -c:v libx264 -preset slow -crf 17 -profile:v high -pix_fmt yuv420p -r 30 -g 60 -x264-params threads=8 \
+  -c:v libx264 -preset slow -crf 22 -profile:v high -pix_fmt yuv420p -r 30 -g 60 -x264-params threads=8 \
   -c:a aac -b:a 192k -ar 48000 -ac 2 -c:s mov_text -metadata:s:s:0 language=eng \
   -t <total from audio/timings.json> -movflags +faststart -map_metadata -1 -fflags +bitexact -flags:v +bitexact -flags:a +bitexact \
   output/how_el_nino_forms.mp4

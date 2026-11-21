@@ -43,7 +43,7 @@ ffmpeg -hide_banner -y \
   -i subtitles/elnino.srt \
   -filter_complex "${CONCAT}concat=n=${N}:v=0:a=1,loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout];[0:v]${VIDEO_FILTER}[vout]" \
   -map "[vout]" -map "[aout]" -map "$((N+1)):s" \
-  -c:v libx264 -preset slow -crf 17 -profile:v high -pix_fmt yuv420p -r "$FPS" -g $((FPS*2)) -x264-params threads=8 \
+  -c:v libx264 -preset slow -crf 22 -profile:v high -pix_fmt yuv420p -r "$FPS" -g $((FPS*2)) -x264-params threads=8 \
   -c:a aac -b:a 192k -ar 48000 -ac 2 \
   -c:s mov_text -metadata:s:s:0 language=eng \
   -t "$TOTAL" -movflags +faststart -map_metadata -1 -fflags +bitexact -flags:v +bitexact -flags:a +bitexact \
