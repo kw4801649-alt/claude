@@ -1,434 +1,434 @@
 1
-00:00:00,500 --> 00:00:01,527
+00:00:00,500 --> 00:00:01,480
 Every few years,
 
 2
-00:00:01,567 --> 00:00:05,927
+00:00:01,520 --> 00:00:05,686
 a huge stretch of the tropical
 Pacific Ocean turns unusually warm,
 
 3
-00:00:05,967 --> 00:00:08,861
+00:00:05,726 --> 00:00:08,490
 and weather around the
 world shifts with it.
 
 4
-00:00:08,901 --> 00:00:13,462
+00:00:08,530 --> 00:00:12,888
 Peruvian fishermen noticed this warm
 water arriving around Christmas,
 
 5
-00:00:13,502 --> 00:00:15,902
+00:00:12,928 --> 00:00:15,222
 and named it El Niño: the boy child.
 
 6
-00:00:16,701 --> 00:00:21,292
+00:00:16,022 --> 00:00:20,835
 So how does El Niño form?
 Let's build it, piece by piece.
 
 7
-00:00:23,500 --> 00:00:25,830
+00:00:23,500 --> 00:00:25,767
 Let's start with normal conditions.
 
 8
-00:00:25,870 --> 00:00:30,909
+00:00:25,807 --> 00:00:30,710
 Picture the Pacific along the equator:
 Indonesia and Australia on the left,
 
 9
-00:00:30,949 --> 00:00:32,778
+00:00:30,750 --> 00:00:32,530
 South America on the right.
 
 10
-00:00:33,578 --> 00:00:38,128
+00:00:33,330 --> 00:00:37,938
 Near the surface, the trade winds,
 the steady winds of the tropics,
 
 11
-00:00:38,168 --> 00:00:42,101
+00:00:37,978 --> 00:00:41,962
 blow from east to west. They
 push warm surface water west,
 
 12
-00:00:42,140 --> 00:00:45,360
+00:00:42,002 --> 00:00:45,262
 piling it into a deep
 warm pool near Indonesia.
 
 13
-00:00:46,160 --> 00:00:51,851
+00:00:46,062 --> 00:00:51,622
 Above the warm pool, moist air rises,
 builds towering storm clouds, and rains.
 
 14
-00:00:51,891 --> 00:00:57,288
+00:00:51,662 --> 00:00:56,934
 High up, that air flows back east and
 sinks over the cool eastern Pacific,
 
 15
-00:00:57,328 --> 00:01:02,545
+00:00:56,974 --> 00:01:02,071
 where skies stay dry. This giant loop
 is called the Walker circulation.
 
 16
-00:01:05,500 --> 00:01:07,834
+00:01:05,500 --> 00:01:07,841
 Now let's look beneath the surface.
 
 17
-00:01:07,874 --> 00:01:11,565
+00:01:07,881 --> 00:01:11,582
 A warm upper layer of ocean
 floats on cold, deep water.
 
 18
-00:01:11,605 --> 00:01:14,617
+00:01:11,622 --> 00:01:14,644
 The boundary between
 them is the thermocline:
 
 19
-00:01:14,657 --> 00:01:18,388
+00:01:14,684 --> 00:01:18,425
 a thin zone where temperature
 drops quickly with depth.
 
 20
-00:01:19,188 --> 00:01:25,199
+00:01:19,226 --> 00:01:25,072
 Because the winds pile warm water in the
 west, the thermocline there sits deep,
 
 21
-00:01:25,239 --> 00:01:30,714
+00:01:25,112 --> 00:01:30,436
 about 150 meters down. In the east,
 it's only a few tens of meters deep.
 
 22
-00:01:30,754 --> 00:01:32,669
+00:01:30,476 --> 00:01:32,339
 So the thermocline tilts.
 
 23
-00:01:33,469 --> 00:01:37,463
+00:01:33,139 --> 00:01:37,089
 Off South America, the winds,
 helped by Earth's rotation,
 
 24
-00:01:37,503 --> 00:01:41,356
+00:01:37,129 --> 00:01:40,938
 push surface water away from
 the coast and the equator.
 
 25
-00:01:41,396 --> 00:01:45,674
+00:01:40,978 --> 00:01:45,208
 Cold water rises from below to
 replace it. This is upwelling.
 
 26
-00:01:45,714 --> 00:01:47,373
+00:01:45,248 --> 00:01:46,888
 It feeds rich fisheries,
 
 27
-00:01:47,413 --> 00:01:52,721
+00:01:46,928 --> 00:01:52,177
 and creates a strip of cool water along
 the equator called the cold tongue.
 
 28
-00:01:55,500 --> 00:02:00,288
+00:01:55,500 --> 00:02:00,211
 These pieces reinforce one another, in
 what's called the Bjerknes feedback,
 
 29
-00:02:00,328 --> 00:02:02,838
+00:02:00,251 --> 00:02:02,722
 after the meteorologist Jacob Bjerknes.
 
 30
-00:02:03,638 --> 00:02:07,756
+00:02:03,522 --> 00:02:07,590
 Strong trade winds drive upwelling,
 which keeps the east cold.
 
 31
-00:02:07,796 --> 00:02:13,054
+00:02:07,630 --> 00:02:12,824
 A cold east and a warm west make a big
 temperature difference across the ocean.
 
 32
-00:02:13,094 --> 00:02:16,475
+00:02:12,864 --> 00:02:16,203
 That difference creates an
 air-pressure difference,
 
 33
-00:02:16,515 --> 00:02:19,225
+00:02:16,243 --> 00:02:18,919
 which drives the trade winds even harder.
 
 34
-00:02:19,265 --> 00:02:23,758
+00:02:18,959 --> 00:02:23,398
 Stronger winds mean more upwelling,
 and the loop goes around again.
 
 35
-00:02:24,558 --> 00:02:27,624
+00:02:24,198 --> 00:02:27,383
 A loop like this can
 hold the Pacific steady.
 
 36
-00:02:27,664 --> 00:02:29,804
+00:02:27,423 --> 00:02:29,644
 But it can also run in reverse.
 
 37
-00:02:32,500 --> 00:02:34,464
+00:02:32,500 --> 00:02:34,395
 That's how an El Niño begins.
 
 38
-00:02:34,504 --> 00:02:39,163
+00:02:34,435 --> 00:02:38,933
 The trade winds weaken, sometimes
 helped by bursts of westerly wind,
 
 39
-00:02:39,203 --> 00:02:42,175
+00:02:38,973 --> 00:02:41,842
 which blow from the
 west for days or weeks.
 
 40
-00:02:42,976 --> 00:02:47,833
+00:02:42,642 --> 00:02:47,499
 With less wind holding it back, the
 piled-up warm water sloshes east.
 
 41
-00:02:47,873 --> 00:02:53,369
+00:02:47,539 --> 00:02:53,034
 It travels as a Kelvin wave: a broad,
 slow bulge that rides along the equator,
 
 42
-00:02:53,409 --> 00:02:56,705
+00:02:53,074 --> 00:02:56,369
 pushing the thermocline
 down by tens of meters.
 
 43
-00:02:56,745 --> 00:02:59,797
+00:02:56,409 --> 00:02:59,461
 It crosses the Pacific
 in about two months.
 
 44
-00:03:00,597 --> 00:03:04,491
+00:03:00,261 --> 00:03:04,248
 In the east, the thermocline
 deepens and the tilt flattens.
 
 45
-00:03:04,531 --> 00:03:09,598
+00:03:04,288 --> 00:03:09,476
 Upwelling now brings up warm water
 instead of cold, so the surface heats up.
 
 46
-00:03:13,500 --> 00:03:16,199
+00:03:13,500 --> 00:03:16,128
 Now the Bjerknes feedback runs in reverse.
 
 47
-00:03:16,239 --> 00:03:19,655
+00:03:16,168 --> 00:03:19,496
 A warmer east means a smaller
 temperature difference,
 
 48
-00:03:19,695 --> 00:03:24,717
+00:03:19,536 --> 00:03:24,428
 which weakens the winds further, which
 lets even more warm water spread east.
 
 49
-00:03:25,517 --> 00:03:29,970
+00:03:25,228 --> 00:03:29,527
 Warm water now covers much of
 the central and eastern Pacific.
 
 50
-00:03:30,010 --> 00:03:34,897
+00:03:29,567 --> 00:03:34,285
 The rising air and heavy rain follow
 it, moving away from Indonesia.
 
 51
-00:03:34,937 --> 00:03:38,343
+00:03:34,325 --> 00:03:37,614
 The Walker circulation
 weakens and shifts east.
 
 52
-00:03:39,143 --> 00:03:44,027
+00:03:38,414 --> 00:03:43,350
 It even disturbs the jet stream,
 a fast river of air high above us.
 
 53
-00:03:44,067 --> 00:03:47,848
+00:03:43,390 --> 00:03:47,212
 In winter, the jet often
 strengthens and dips south,
 
 54
-00:03:47,888 --> 00:03:50,714
+00:03:47,252 --> 00:03:50,109
 steering storms toward the southern US.
 
 55
-00:03:50,754 --> 00:03:54,502
+00:03:50,149 --> 00:03:53,937
 El Niño usually peaks
 between November and January.
 
 56
-00:03:57,500 --> 00:04:01,098
+00:03:57,500 --> 00:04:00,913
 These changes ripple around the
 world through teleconnections:
 
 57
-00:04:01,138 --> 00:04:03,485
+00:04:00,953 --> 00:04:03,180
 links between weather in faraway places.
 
 58
-00:04:04,285 --> 00:04:09,585
+00:04:03,980 --> 00:04:09,667
 El Niño often brings drought to
 Indonesia, Australia, and southern Africa,
 
 59
-00:04:09,625 --> 00:04:11,749
+00:04:09,707 --> 00:04:11,989
 and a weaker monsoon to India.
 
 60
-00:04:11,789 --> 00:04:15,141
+00:04:12,029 --> 00:04:15,626
 Peru and Ecuador can see
 heavy rain and floods.
 
 61
-00:04:15,181 --> 00:04:18,460
+00:04:15,666 --> 00:04:19,186
 The southern US tends
 to have a wetter winter,
 
 62
-00:04:18,500 --> 00:04:22,068
+00:04:19,226 --> 00:04:23,056
 while Canada and the
 northern US are often milder.
 
 63
-00:04:22,108 --> 00:04:25,171
+00:04:23,096 --> 00:04:26,383
 Atlantic hurricanes
 are usually suppressed,
 
 64
-00:04:25,211 --> 00:04:29,396
+00:04:26,423 --> 00:04:30,912
 while more storms form in the
 central and eastern Pacific.
 
 65
-00:04:30,196 --> 00:04:32,388
+00:04:31,712 --> 00:04:33,831
 As the ocean releases heat,
 
 66
-00:04:32,428 --> 00:04:38,920
+00:04:33,871 --> 00:04:40,149
 the global average temperature often
 rises by about 0.1 to 0.2 degrees Celsius.
 
 67
-00:04:38,960 --> 00:04:42,311
+00:04:40,189 --> 00:04:43,428
 But these are tendencies, not guarantees.
 
 68
-00:04:42,351 --> 00:04:44,583
+00:04:43,468 --> 00:04:45,627
 Every El Niño is different.
 
 69
-00:04:47,500 --> 00:04:49,590
+00:04:47,500 --> 00:04:49,557
 El Niño doesn't last forever.
 
 70
-00:04:49,630 --> 00:04:54,071
+00:04:49,597 --> 00:04:53,967
 While Kelvin waves carry warm
 water east, slower ocean waves,
 
 71
-00:04:54,111 --> 00:04:56,495
+00:04:54,007 --> 00:04:56,352
 called Rossby waves, travel west.
 
 72
-00:04:56,535 --> 00:05:01,196
+00:04:56,392 --> 00:05:00,979
 They bounce off the western edge
 of the Pacific and return east,
 
 73
-00:05:01,236 --> 00:05:03,694
+00:05:01,019 --> 00:05:03,437
 gradually lifting the thermocline.
 
 74
-00:05:03,734 --> 00:05:07,627
+00:05:03,477 --> 00:05:07,309
 Meanwhile, El Niño drains
 heat away from the equator.
 
 75
-00:05:08,427 --> 00:05:12,691
+00:05:08,109 --> 00:05:12,344
 The trade winds recover, upwelling
 returns, and the east cools.
 
 76
-00:05:12,731 --> 00:05:17,338
+00:05:12,384 --> 00:05:16,959
 Sometimes the system overshoots
 into La Niña, El Niño's counterpart:
 
 77
-00:05:17,378 --> 00:05:21,164
+00:05:16,999 --> 00:05:20,759
 stronger trade winds, an
 unusually cold eastern Pacific,
 
 78
-00:05:21,204 --> 00:05:25,235
+00:05:20,799 --> 00:05:24,803
 and weather that is often
 roughly the reverse of El Niño's.
 
 79
-00:05:27,500 --> 00:05:32,582
+00:05:27,500 --> 00:05:32,578
 Together, El Niño and La Niña form
 ENSO, the El Niño–Southern Oscillation.
 
 80
-00:05:32,622 --> 00:05:35,351
+00:05:32,618 --> 00:05:35,344
 The Southern Oscillation is the matching
 
 81
-00:05:35,391 --> 00:05:38,368
+00:05:35,384 --> 00:05:38,358
 see-saw in air pressure
 across the Pacific.
 
 82
-00:05:39,168 --> 00:05:41,460
+00:05:39,158 --> 00:05:41,391
 It's a natural, irregular cycle,
 
 83
-00:05:41,500 --> 00:05:45,396
+00:05:41,431 --> 00:05:45,227
 and corals show it has existed
 for thousands of years.
 
 84
-00:05:45,436 --> 00:05:48,531
+00:05:45,267 --> 00:05:48,282
 El Niño returns roughly
 every 2 to 7 years,
 
 85
-00:05:48,571 --> 00:05:52,215
+00:05:48,322 --> 00:05:51,874
 and each event usually
 lasts about 9 to 12 months.
 
 86
-00:05:53,015 --> 00:05:55,612
+00:05:52,674 --> 00:05:55,341
 Climate change didn't create El Niño.
 
 87
-00:05:55,652 --> 00:06:00,459
+00:05:55,381 --> 00:06:00,316
 But on a warmer planet, its impacts,
 like heat waves and heavy rain,
 
 88
-00:06:00,499 --> 00:06:05,488
+00:06:00,356 --> 00:06:05,478
 can hit harder. How ENSO itself will
 change is still being researched.
 
 89
-00:06:08,500 --> 00:06:13,829
+00:06:08,500 --> 00:06:13,963
 So, to recap: the trade winds weaken,
 warm water sloshes east, the rain follows,
 
 90
-00:06:13,869 --> 00:06:15,882
+00:06:14,003 --> 00:06:16,067
 and the whole planet feels it.
 
 91
-00:06:16,682 --> 00:06:19,061
+00:06:16,867 --> 00:06:19,142
 Next time you hear that
 El Niño is on the way,
 
 92
-00:06:19,101 --> 00:06:21,625
+00:06:19,182 --> 00:06:21,598
 you'll know what's happening
 out in the Pacific.

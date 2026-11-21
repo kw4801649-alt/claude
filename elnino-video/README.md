@@ -6,7 +6,7 @@ built only with free and open-source tools:
 | Step | Tool | What it makes |
 |---|---|---|
 | Narration | `config/scenes.json` | Script and fixed scene slots (single source of truth) |
-| Voice | **edge-tts** (primary) / **Piper** (offline fallback) | `audio/s01.wav` … `audio/s10.wav` |
+| Voice | **Phonon 31M** (primary, offline) / **edge-tts** / **Piper** (fallbacks) | `audio/s01.wav` … `audio/s10.wav` |
 | Subtitles | `tools/build_srt.py` | `subtitles/elnino.srt` |
 | 3D scenes | **Three.js** (one HTML file) | `scene/index.html`, everything driven by a time `t` |
 | Frames | **Puppeteer + headless Chrome** | `frames/f_00000.png` … `f_11549.png` |
@@ -14,7 +14,7 @@ built only with free and open-source tools:
 
 ## Assumptions
 
-1. **Voice:** edge-tts `en-US-AriaNeural` at `-6%`, which measures about 148 wpm while speaking. Piper's fallback is `en_US-lessac-medium` at `length_scale 1.25`.
+1. **Voice:** Phonon 31M (`gradium/phonon-31m-en`, Apache 2.0), voice **Hadley**, one sentence at a time with 0.3 s gaps. That measures about 149 wpm while speaking. Fallbacks: edge-tts `en-US-AriaNeural` at `-6%`, then Piper `en_US-lessac-medium` at `length_scale 1.25`. To change the voice, edit `tts.phonon.voice` in `config/scenes.json` (narrator-friendly options: Hadley, Preston, Spencer, Miles, Everly).
 2. **Fixed timing:** each scene has a fixed length (`duration` in `config/scenes.json`). Each scene's audio is padded with silence to exactly that length, so the picture never depends on how fast the voice speaks. The total is **385 s = 6:25**.
 3. **`[PAUSE]` timing:** each `[PAUSE]` becomes 0.8 s of silence, and every scene starts with 0.5 s of silence.
 4. **Cross-section view:** the 3D "Pacific box" follows the classic NOAA-style diagram. The top is the sea surface from 22°N to 15°S and 100°E to 60°W. The front face is a schematic **equatorial** cross-section, with depth hugely exaggerated (an on-screen note says so).
@@ -34,6 +34,7 @@ built only with free and open-source tools:
 | three | **0.187.0** (pinned) | loaded from `node_modules` (no CDN at render time) |
 | @fontsource/inter | **5.3.0** (pinned) | on-screen typography, loaded locally |
 | Python | ≥ 3.9 (tested 3.13.18) | TTS and subtitle scripts |
+| ptts (Phonon runtime) | **0.7.1** (pinned) | Phonon 31M, Apache 2.0, CPU, only needs numpy; model (~65 MB) downloads on first use |
 | edge-tts | **7.3.1** (pinned) | needs internet, no API key |
 | piper-tts | **1.8.0** (pinned) | offline, pulls onnxruntime (tested 1.32.0) |
 | FFmpeg | ≥ 6.0 (tested 6.1.1) | must include `libx264` and `libass` (standard builds do) |
@@ -46,7 +47,7 @@ elnino-video/
 ├── config/scenes.json          # narration text, scene slots, voices, pronunciations
 ├── docs/01_narration_script.md # deliverable 1 (generated from scenes.json)
 ├── docs/02_storyboard.md       # deliverable 2
-├── tools/tts.py                # deliverable 3: edge-tts -> Piper fallback, one WAV per scene
+├── tools/tts.py                # deliverable 3: Phonon -> edge-tts -> Piper, one WAV per scene
 ├── scene/index.html            # deliverable 4: Three.js scene + camera keyframes
 ├── render/serve.mjs            # local static server (preview + capture)
 ├── render/capture.mjs          # deliverable 5a: deterministic frame capture
@@ -79,7 +80,7 @@ brew install --cask font-dejavu
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install -r requirements.txt      # edge-tts==7.3.1, piper-tts==1.8.0
+pip install -r requirements.txt      # ptts==0.7.1, edge-tts==7.3.1, piper-tts==1.8.0
 ```
 
 ### 2. Node dependencies (Three.js, Puppeteer and its pinned Chrome)
@@ -96,7 +97,8 @@ If `npm ci` skipped the browser download because `PUPPETEER_SKIP_DOWNLOAD` or
 ### 3. Generate the narration audio (one file per scene)
 
 ```bash
-python tools/tts.py                  # edge-tts; if it fails, regenerates ALL scenes with Piper
+python tools/tts.py                  # Phonon; if it fails, edge-tts, then Piper (ALL scenes re-made each time)
+python tools/tts.py --engine phonon  # force Phonon 31M (voice Hadley; ~1 min on CPU for the whole film)
 python tools/tts.py --engine edge    # force edge-tts (voice en-US-AriaNeural, rate -6%)
 python tools/tts.py --engine piper   # force Piper (offline; downloads en_US-lessac-medium to voices/ once)
 ```
@@ -107,6 +109,7 @@ cached: a re-run only re-synthesizes scenes whose text or settings changed. Use 
 everything. If a scene's speech doesn't fit its slot, the script stops and tells you the minimum
 `duration` to set.
 
+Phonon downloads its model and voice into the Hugging Face cache (`~/.cache/huggingface`) the first time it runs.
 To pre-download the Piper voice yourself: `python -m piper.download_voices --download-dir voices en_US-lessac-medium`.
 
 ### 4. Subtitles and script document
@@ -116,7 +119,7 @@ python tools/build_srt.py            # subtitles/elnino.srt, timed to the audio 
 python tools/make_script_doc.py      # docs/01_narration_script.md (adds measured wpm)
 ```
 
-The committed `subtitles/elnino.srt` was built from a reference edge-tts run. Re-run
+The committed `subtitles/elnino.srt` was built from a reference Phonon run. Re-run
 `build_srt.py` after step 3, because each TTS run can differ by a few hundredths of a second.
 
 ### 5. (Optional) Preview in a browser
@@ -192,9 +195,12 @@ ffmpeg -hide_banner -y \
 * **Pinned renderer:** WebGL runs on SwiftShader inside the Chrome build pinned by Puppeteer, with fonts
   and Three.js served from `node_modules`.
 * **Encoding:** FFmpeg uses `+bitexact` flags, strips metadata and pins the x264 thread count.
-* **Audio:** edge-tts is a cloud service and its MP3 bytes vary slightly from run to run. The audio is
-  therefore generated once and cached, with SHA-256 hashes in `audio/manifest.json`. Keep `audio/` with your
-  project to reproduce a cut exactly. Piper is run with zero noise and is byte-for-byte reproducible.
+* **Audio:** Phonon runs with a fixed seed on one CPU thread. Re-runs give identical timings to the
+  millisecond. At most a few dozen samples per scene differ by 1/32768 (about −115 dB, inaudible), because
+  of floating-point rounding in the runtime. edge-tts is a cloud service and its bytes vary slightly per run.
+  Either way the audio is generated once and cached, with SHA-256 hashes in `audio/manifest.json`. Keep
+  `audio/` with your project to reproduce a cut exactly. Piper is run with zero noise and is byte-for-byte
+  reproducible.
   Pass `--piper-natural` for a livelier but non-reproducible Piper voice.
 * **Timing:** the video timeline never depends on the audio, because scene slots are fixed.
 
@@ -209,6 +215,8 @@ ffmpeg -hide_banner -y \
 
 ## Troubleshooting
 
+* **Phonon can't download its model:** it needs access to `huggingface.co` the first time. Behind a
+  TLS proxy, set `SSL_CERT_FILE` to your CA bundle. Otherwise run `--engine edge` or `--engine piper`.
 * **`edge-tts` gives `NoAudioReceived` or SSL errors:** edge-tts needs internet access to
   `speech.platform.bing.com`. Behind a corporate TLS proxy, add the proxy CA to certifi's bundle
   (`python -c "import certifi; print(certifi.where())"`). Otherwise use `--engine piper`.

@@ -1,3 +1,4 @@
 # Python dependencies for the TTS step (tested with Python 3.13; works on 3.9+)
-edge-tts==7.3.1        # primary voice: free Microsoft Edge online TTS, no API key
-piper-tts==1.8.0       # offline fallback (pulls onnxruntime)
+ptts==0.7.1            # primary voice: Phonon 31M open-weights TTS (Apache 2.0), offline on CPU
+edge-tts==7.3.1        # fallback 1: free Microsoft Edge online TTS, no API key
+piper-tts==1.8.0       # fallback 2: offline Piper (pulls onnxruntime)

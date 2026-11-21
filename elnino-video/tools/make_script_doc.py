@@ -28,8 +28,9 @@ lines = [
     "",
     "_Generated from `config/scenes.json` by `tools/make_script_doc.py`; edit the JSON, not this file._",
     "",
-    "- Voice: edge-tts `{voice}` at rate `{rate}` (fallback: Piper `{pv}`)".format(
-        voice=cfg["tts"]["edge"]["voice"], rate=cfg["tts"]["edge"]["rate"], pv=cfg["tts"]["piper"]["voice"]),
+    "- Voice: Phonon 31M `{ph}` (fallbacks: edge-tts `{voice}` at `{rate}`, then Piper `{pv}`)".format(
+        ph=cfg["tts"]["phonon"]["voice"], voice=cfg["tts"]["edge"]["voice"], rate=cfg["tts"]["edge"]["rate"],
+        pv=cfg["tts"]["piper"]["voice"]),
     f"- `[PAUSE]` = {cfg['audio']['pause_s']} s of silence so the visuals can breathe; "
     f"each scene starts with {cfg['audio']['lead_in_s']} s of silence.",
     "- Scene slots are fixed: audio is padded to the slot, so the picture never depends on speaking speed.",

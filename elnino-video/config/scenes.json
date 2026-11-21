@@ -12,6 +12,20 @@
     "min_tail_s": 0.5
   },
   "tts": {
+    "engine_order": [
+      "phonon",
+      "edge",
+      "piper"
+    ],
+    "phonon": {
+      "model": "hf://gradium/phonon-31m-en",
+      "quant": "q8",
+      "voice": "Hadley",
+      "seed": 1234,
+      "temperature": null,
+      "sentence_silence": 0.3,
+      "threads": 1
+    },
     "edge": {
       "voice": "en-US-AriaNeural",
       "rate": "-6%",

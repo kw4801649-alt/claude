@@ -2,8 +2,9 @@
 """
 tools/tts.py -- Generate one narration WAV per scene for "How El Niño Forms".
 
-Primary engine : edge-tts (free Microsoft Edge online voices, no API key)
-Fallback engine: Piper TTS (fully offline, open source)
+Primary engine : Phonon 31M via `ptts` (Apache-2.0 open weights, offline, CPU, seeded = bit-exact)
+Fallback 1     : edge-tts (free Microsoft Edge online voices, no API key)
+Fallback 2     : Piper TTS (fully offline, open source)
 
 Output (all paths relative to the project root):
     audio/s01.wav ... audio/s10.wav   48 kHz, mono, 16-bit PCM. Each file is padded
@@ -19,7 +20,8 @@ Every scene is built as:
 where segments are the narration split at each [PAUSE] marker.
 
 Usage:
-    python tools/tts.py                    # auto: edge-tts, fall back to Piper on failure
+    python tools/tts.py                    # auto: Phonon, then edge-tts, then Piper
+    python tools/tts.py --engine phonon    # Phonon only (offline after the first model download)
     python tools/tts.py --engine edge      # edge-tts only
     python tools/tts.py --engine piper     # Piper only (offline)
     python tools/tts.py --force            # ignore the cache and regenerate everything
@@ -157,6 +159,70 @@ class EdgeEngine:
         raise TTSError(f"edge-tts failed after 4 attempts: {last_exc}")
 
 
+class PhononEngine:
+    """Phonon 31M (gradium/phonon-31m-en), run by the `ptts` runtime.
+
+    Each sentence is synthesized separately with a fixed seed and joined with a fixed
+    gap, which gives a calm documentary pace. With a fixed seed and one CPU thread the
+    output is byte-identical on every run.
+    """
+    name = "phonon"
+
+    def __init__(self, cfg: dict):
+        try:
+            import ptts
+        except ImportError as exc:
+            raise TTSError("ptts is not installed: pip install -r requirements.txt") from exc
+        self.model_id = cfg["model"]
+        self.quant = cfg["quant"]
+        self.voice = cfg["voice"]
+        self.seed = int(cfg["seed"])
+        self.temperature = cfg.get("temperature")
+        self.sentence_silence = float(cfg["sentence_silence"])
+        # Multi-threaded float reductions change the last bits between runs; one thread
+        # makes Phonon byte-for-byte reproducible (the whole narration still takes ~2 min).
+        self.threads = int(cfg.get("threads", 1))
+        if self.threads > 0:
+            ptts.set_num_threads(self.threads)
+        try:  # first use downloads the model (~65 MB) and the voice into the Hugging Face cache
+            self.tts = ptts.TTS(self.model_id, lang="en", quant=self.quant)
+        except Exception as exc:
+            raise TTSError(f"could not load {self.model_id}: {exc}") from exc
+        self.version = getattr(ptts, "__version__", "unknown")
+
+    def settings(self) -> dict:
+        return {"engine": self.name, "model": self.model_id, "quant": self.quant, "voice": self.voice,
+                "seed": self.seed, "temperature": self.temperature,
+                "sentence_silence": self.sentence_silence, "threads": self.threads, "ptts": self.version}
+
+    def synth(self, text: str, out_path: Path) -> None:
+        sentences = [s for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        sr = self.tts.sample_rate
+        gap = b"\x00\x00" * int(round(self.sentence_silence * sr))
+        frames = bytearray()
+        with tempfile.TemporaryDirectory(prefix="phonon_") as td:
+            part = Path(td) / "s.wav"
+            for i, sentence in enumerate(sentences):
+                kw = {"voice": self.voice, "seed": self.seed}
+                if self.temperature is not None:
+                    kw["temperature"] = float(self.temperature)
+                try:
+                    self.tts.save(str(part), sentence, **kw)
+                except Exception as exc:
+                    raise TTSError(f"phonon failed on {sentence!r}: {exc}") from exc
+                with wave.open(str(part), "rb") as w:
+                    if w.getframerate() != sr or w.getsampwidth() != 2 or w.getnchannels() != 1:
+                        raise TTSError("unexpected WAV format from ptts")
+                    frames += w.readframes(w.getnframes())
+                if i < len(sentences) - 1:
+                    frames += gap
+        with wave.open(str(out_path), "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(sr)
+            w.writeframes(bytes(frames))
+
+
 class PiperEngine:
     name = "piper"
 
@@ -269,6 +335,8 @@ def build_scene(scene: dict, engine, cfg: dict, tmp: Path) -> dict:
 
 
 def make_engine(kind: str, cfg: dict, args):
+    if kind == "phonon":
+        return PhononEngine(cfg["tts"]["phonon"])
     if kind == "edge":
         return EdgeEngine(cfg["tts"]["edge"])
     return PiperEngine(cfg["tts"]["piper"], args.piper_natural, args.piper_model)
@@ -276,7 +344,7 @@ def make_engine(kind: str, cfg: dict, args):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--engine", choices=["auto", "edge", "piper"], default="auto")
+    ap.add_argument("--engine", choices=["auto", "phonon", "edge", "piper"], default="auto")
     ap.add_argument("--force", action="store_true", help="regenerate even if cached")
     ap.add_argument("--only", default="", help="comma-separated scene ids, e.g. s03,s04")
     ap.add_argument("--piper-model", default=None, help="path to a Piper .onnx voice")
@@ -298,7 +366,7 @@ def main() -> int:
     timings = json.loads(timings_path.read_text("utf-8")) if timings_path.exists() else {}
     manifest = json.loads(manifest_path.read_text("utf-8")) if manifest_path.exists() else {"scenes": {}}
 
-    order = ["edge", "piper"] if args.engine == "auto" else [args.engine]
+    order = cfg["tts"].get("engine_order", ["phonon", "edge", "piper"]) if args.engine == "auto" else [args.engine]
     last_error: Exception | None = None
     for kind in order:
         try:
@@ -340,9 +408,9 @@ def main() -> int:
                 print(f"ERROR: {exc}", file=sys.stderr)
                 return 2
             print(f"[{kind}] failed: {exc}", file=sys.stderr)
-            if kind == "edge" and "piper" in order:
-                print("Falling back to Piper and regenerating ALL scenes so the voice is consistent.",
-                      file=sys.stderr)
+            if kind != order[-1]:
+                print("Falling back to the next engine and regenerating ALL scenes so the voice "
+                      "is consistent.", file=sys.stderr)
                 scenes = cfg["scenes"]
                 args.force = True
     print(f"ERROR: no TTS engine succeeded: {last_error}", file=sys.stderr)
