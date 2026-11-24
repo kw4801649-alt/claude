@@ -1,6 +1,6 @@
 # Contact Forces, Derived (IB Physics SL · A.2)
 
-An 8-minute animated derivation of every contact force in the IB Physics SL syllabus (first assessment 2025).
+A 13-minute animated derivation of every contact force in the IB Physics SL syllabus (first assessment 2025).
 It shows where each term on a free-body diagram comes from, with the trigonometry made visible.
 It excludes elastic forces, circular motion and kinematics.
 
@@ -32,7 +32,7 @@ The background research is in `docs/00_research.md`, including the syllabus list
 | Voice | **Phonon 31M** (offline, Apache 2.0) → edge-tts → Piper | `audio/s01.wav`…`s13.wav` + `audio/timings.json` (sentence-level timeline) |
 | Subtitles | `tools/build_srt.py` | `subtitles/contact_forces.srt` |
 | Scene | **SVG + KaTeX** in one HTML file | `scene/index.html`, a pure function of time `t` |
-| Frames | Puppeteer + headless Chrome | `frames/f_00000.png`… (≈14,600 frames) |
+| Frames | Puppeteer + headless Chrome | `frames/f_00000.png`… (≈24,000 frames) |
 | Video | FFmpeg | `output/contact_forces_derived.mp4` |
 
 ## Versions
@@ -60,14 +60,14 @@ python tools/tts.py                       # narration + audio/timings.json (≈1
 python tools/build_srt.py                 # subtitles
 python tools/make_script_doc.py && python tools/make_storyboard.py   # docs (optional)
 npm run render:test                       # 39 review stills -> renders/test/ (optional)
-node render/capture.mjs --workers 3       # all frames (≈10 min on 4 cores: SVG renders fast)
+node render/capture.mjs --workers 3       # all frames (≈20 min on 4 cores: SVG renders fast)
 bash tools/assemble.sh                    # output/contact_forces_derived.mp4 (soft subtitles)
 BURN_SUBS=1 bash tools/assemble.sh        # …or with subtitles burned in
 ```
 
 `npm run preview` serves `http://127.0.0.1:8080/scene/index.html?preview=1`, which gives a scrubber with narration playback.
 
-**Expected result:** **8:08** (488.1 s), 14,643 frames, H.264 1920×1080 30 fps, AAC 48 kHz at about −16 LUFS,
+**Expected result:** **13:19** (798.8 s), 23,964 frames, H.264 1920×1080 30 fps, AAC 48 kHz at about −16 LUFS,
 with an English subtitle track.
 
 ## How the timing works
@@ -79,6 +79,14 @@ with an English subtitle track.
 - **Rewording a cued phrase:** the page names the missing cue.
 
 Frames are deterministic: no clock, no randomness, and they render in any order.
+
+## Pace and pronunciation
+
+- **Pace:** about 140 words per minute overall (150–170 while talking). It's set by `audio.tempo` (0.9), `audio.pause_s`
+  (0.8 s per `[PAUSE]`) and `tts.phonon.sentence_silence` (0.28 s). Raise `tempo` toward 1.0 to speed it up, then re-run `python tools/tts.py`.
+- **Pronunciation:** the voice garbles bare symbols, so `pronunciations` in `config/scenes.json` respells them for the voice only
+  (the subtitles keep the real text). For example `mg` → "em gee", `T` → "tee", `g` → "gee", `cos` → "co-sine", `Stokes'` → "Stokes".
+- **Checking by ear without listening:** transcribe `audio/sNN.wav` with any speech-to-text model and compare it with the narration.
 
 ## Editing
 

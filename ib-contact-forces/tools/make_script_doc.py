@@ -32,7 +32,7 @@ lines = [
         ph=cfg["tts"]["phonon"]["voice"], voice=cfg["tts"]["edge"]["voice"], rate=cfg["tts"]["edge"]["rate"],
         pv=cfg["tts"]["piper"]["voice"]),
     f"- `[PAUSE]` = {cfg['audio']['pause_s']} s of silence so the visuals can breathe; "
-    f"sentences are {cfg['tts']['phonon']['sentence_silence']} s apart; speech is sped up {cfg['audio'].get('tempo', 1.0)}x (pitch kept).",
+    f"sentences are {cfg['tts']['phonon']['sentence_silence']} s apart; speech is time-stretched to {cfg['audio'].get('tempo', 1.0)}x speed (pitch kept; below 1 is slower).",
     "- Scene lengths come from the audio (`audio/timings.json`); every animation is keyed to the words.",
     "",
 ]

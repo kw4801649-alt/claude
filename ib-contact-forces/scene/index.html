@@ -288,8 +288,11 @@ section("s02", (g, c, id) => {
     { tex: "(F\\cos\\theta)^2 + (F\\sin\\theta)^2 = F^2", t: c("together they always rebuild F"), y: 200, size: 42 },
   ], { gap: 110 });
   const rule = hand(g, "cos → the side touching θ   ·   sin → the side across", { size: 58, color: INK, weight: 700 });
+  const ex1 = tex(g, "F = 10\\,\\text{N},\\ \\ \\theta = 30^\\circ", { size: 42, color: COL.F }), ex2 = tex(g, "F\\cos\\theta = 8.7\\,\\text{N}\\qquad F\\sin\\theta = 5.0\\,\\text{N}", { size: 42, color: COL.F });
   return t => {
     H(t);
+    ex1.at(160, 290, ap(t, c("Try it with numbers"), 0.5), { anchor: "l" });
+    ex2.at(160, 370, ap(t, c("has eight point seven"), 0.5), { anchor: "l" });
     const a = th(t), k = ap(t, c("A force is an arrow"), 0.8), comp = ap(t, c("replaced by two perpendicular"), 0.7);
     const tip = [O[0] + L * Math.cos(a * D2R), O[1] - L * Math.sin(a * D2R)], corner = [tip[0], O[1]];
     F.draw(O[0], O[1], tip[0], tip[1], { p: k }); FL.at(...add(tip, [30, -30]), k);
@@ -464,7 +467,8 @@ section("s06", (g, c, id) => {
     { tex: "F_{\\parallel} = mg\\sin\\theta", t: c("pulling down the slope, is mg sin θ") + 0.6 },
     { tex: "F_N = mg\\cos\\theta", t: c("the normal force equals mg cos θ"), final: true, ulw: 390, ulColor: COL.N },
   ], { gap: 110 });
-  const r0 = hand(g, "", { size: 50, weight: 700 });
+  const r0 = hand(g, "", { size: 46, weight: 700 });
+  const exA = tex(g, "m = 2\\,\\text{kg},\\ \\ \\theta = 30^\\circ", { size: 38, color: COL.W }), exB = tex(g, "mg\\sin\\theta = 9.8\\,\\text{N}\\qquad mg\\cos\\theta = 17\\,\\text{N}", { size: 38, color: COL.W });
   const thT = track([[0, 30], [c("Start with the slope flat"), 30], [c("Start with the slope flat") + 1.8, 0], [c("Now tilt the slope by θ"), 0], [c("Now tilt the slope by θ") + 2.4, 30],
     [c("At zero degrees") - 0.3, 30], [c("At zero degrees") + 1.3, 0], [c("At ninety degrees") - 0.3, 0], [c("At ninety degrees") + 2.0, 86], [E(id) - 1.6, 86], [E(id) - 0.1, 30]]);
   S06.th = thT;
@@ -515,7 +519,9 @@ section("s06", (g, c, id) => {
     triHL.at(ad / 2 - 40, op_ / 2 + 45, 1, { rot: -rot }); triAL.at(ad / 2, -40, 1, { rot: -rot }); triOL.at(ad + 20, op_ / 2, 1, { anchor: "l", rot: -rot }); triTh.at(110, 26, 1, { rot: -rot });
     E1(t);
     const z0 = c("At zero degrees"), n90 = c("At ninety degrees");
-    if (t > z0 - 0.2) r0.write(230, 400, t, z0, { speed: 0.001, op: ap(t, z0) * (1 - ap(t, E(id) - 1.6, 0.6)),
+    const exk = ap(t, c("A quick example"), 0.5) * (1 - ap(t, c("Check the extremes"), 0.5));
+    exA.at(280, 330, exk, { anchor: "l" }); exB.at(280, 395, ap(t, c("down the slope is nine point eight"), 0.5) * (1 - ap(t, c("Check the extremes"), 0.5)), { anchor: "l" });
+    if (t > z0 - 0.2) r0.write(250, 480, t, z0, { speed: 0.001, op: ap(t, z0) * (1 - ap(t, E(id) - 1.6, 0.6)),
       txt: `θ = ${Math.round(th)}°:  sin θ = ${fmt(sth)},  cos θ = ${fmt(cth)}` }); else r0.write(0, 0, t, 1e9);
   };
 });
@@ -641,8 +647,8 @@ section("s09", (g, c, id) => {
   const cxL = tex(g, "T\\cos\\alpha", { size: 38, color: COL.T }), cyL = tex(g, "T\\sin\\alpha", { size: 38, color: COL.T });
   const read = hand(g, "", { size: 52, color: COL.T, weight: 700 });
   const asym = c("With unequal angles");
-  const a1 = track([[0, 40], [c("Flatten the strings"), 40], [c("Flatten the strings") + 4, 8], [asym - 1.2, 8], [asym + 0.6, 30]]);
-  const a2 = track([[0, 40], [c("Flatten the strings"), 40], [c("Flatten the strings") + 4, 8], [asym - 1.2, 8], [asym + 0.6, 60]]);
+  const a1 = track([[0, 40], [c("Flatten the strings"), 40], [c("Flatten the strings") + 7, 5], [asym - 1.2, 5], [asym + 0.6, 30]]);
+  const a2 = track([[0, 40], [c("Flatten the strings"), 40], [c("Flatten the strings") + 7, 5], [asym - 1.2, 5], [asym + 0.6, 60]]);
   const E1 = eqs(g, -420, 150, [
     { tex: "2T\\sin\\alpha = mg", t: c("two T sin α equals mg"), until: asym },
     { tex: "T = \\dfrac{mg}{2\\sin\\alpha}", t: c("so T equals mg over"), final: true, ulw: 330, ulColor: COL.T, until: asym },
@@ -706,6 +712,7 @@ section("s10", (g, c, id) => {
   const E1 = eqs(g, -880, 210, [
     { tex: "mg - T = ma", t: c("For the hanging mass") },
     { tex: "T = Ma", t: c("For the block, T equals") },
+    { tex: "\\Rightarrow\\ a = \\dfrac{mg}{M+m}", t: c("So the acceleration equals"), y: 430, size: 44 },
     { tex: "\\Rightarrow\\ T = \\dfrac{M}{M+m}\\,mg\\; < \\; mg", t: c("the tension is always less"), final: true, ulw: 520, ulColor: COL.T, dx: 380, y: 260 },
   ], { gap: 105 });
   return t => {
@@ -746,6 +753,7 @@ section("s11", (g, c, id) => {
     { tex: "\\rho\\,V_{\\text{sub}}\\,g = mg", t: c("ρ times the submerged volume"), y: 300, final: true, ulw: 330, ulColor: COL.B },
   ], { gap: 110 });
   const n1 = hand(g, "ρ = density of the FLUID · V = volume pushed aside", { size: 44 }), n2 = hand(g, "= weight of the displaced fluid", { size: 48, color: COL.B });
+  const n3 = hand(g, "p = ρ g h : weight of the fluid column per area", { size: 42, color: "#2c6fb0" });
   const fl = c("A floating object");
   const yb = track([[0, 130], [fl, 130], [fl + 2.5, -200]]);
   return t => {
@@ -771,6 +779,7 @@ section("s11", (g, c, id) => {
     const subH = Math.max(0, bot - (-230)); set(sub, { x: bx - 140, y: -230, width: 280, height: Math.min(220, subH), opacity: 0.55 * f });
     E1(t);
     n1.write(80, 60, t, c("Here ρ is the fluid's density"), { speed: 0.016 }); n2.write(80, 150, t, c("exactly the weight of the fluid"), { speed: 0.02 });
+    n3.write(80, 235, t, c("That's the weight of a column"), { speed: 0.02 });
   };
 });
 
@@ -783,9 +792,12 @@ section("s12", (g, c, id) => {
   const WdL = tex(g, "mg", { size: 46, color: COL.W }), BdL = tex(g, "F_b", { size: 46, color: COL.B }), DdL = tex(g, "F_d", { size: 46, color: COL.D });
   const drop = c("Drop a ball bearing"), tau = 1.4;
   const v = t => (t < drop ? 0 : 1 - Math.exp(-(t - drop) / tau));
-  const ypos = t => (t < drop ? -300 : -300 + 25 * ((t - drop) - tau * (1 - Math.exp(-(t - drop) / tau))));
+  // terminal speed is chosen so the ball is still inside the tube when the scene ends
+  const vterm = 740 / Math.max(10, E(id) - drop - 1.5);
+  const ypos = t => (t < drop ? -320 : -320 + vterm * ((t - drop) - tau * (1 - Math.exp(-(t - drop) / tau))));
   const cond = hand(g, "small · slow · smooth (laminar) flow", { size: 46, color: COL.D });
   const prop = hand(g, "", { size: 48, color: COL.D, weight: 700 });
+  const n4 = hand(g, "← 4/3 ÷ 6 = 2/9", { size: 44, color: COL.D }), n5 = hand(g, "double r → 4× faster  ·  twice as thick → half as fast", { size: 44, color: COL.D, weight: 700 });
   const E1 = eqs(g, -200, -370, [
     { tex: "F_d = 6\\pi\\eta r v", t: c("Stokes' law gives the drag"), final: true, ulw: 330, ulColor: COL.D },
     { tex: "mg = F_b + 6\\pi\\eta r v_t", t: c("Write the balance"), y: -150 },
@@ -809,6 +821,8 @@ section("s12", (g, c, id) => {
     const lk = fk * ap(t, c("until the forces balance"), 0.6);
     lvl.draw(x - 120, y - mgL - 40, x + 120, y - mgL - 40, lk, lk);
     prop.write(-200, 400, t, c("It grows with speed"), { op: ap(t, c("It grows with speed")), speed: 0.001, txt: t < c("That's terminal speed") ? "F_d ∝ v  —  faster → more drag" : "F_b + F_d = mg  →  terminal speed" });
+    n4.write(260, 230, t, c("Four thirds divided by six"), { speed: 0.03 });
+    n5.write(-200, 480, t, c("Double the radius"), { speed: 0.02 });
     E1(t);
   };
 });
@@ -826,7 +840,7 @@ function updateRecipe(t) {
   recipe.forEach((r, i) => r.write(x0, y0 + i * 600 + 400, t, T[i], { speed: 0.025, op: 1 - out }));
   const dim = ap(t, S(id) + 1.5, 1) * (1 - out);
   for (const s of SECS) s.g.setAttribute("opacity", 1 - 0.72 * dim);
-  finale.write(center("s06")[0] - 900, center("s06")[1] - 190, t, c("It's just one side"), { speed: 0.03 });
+  finale.write(center("s06")[0] - 790, center("s06")[1] - 200, t, c("It's just one side"), { speed: 0.03 });
 }
 
 /* ========================================================== camera */
@@ -851,8 +865,8 @@ ids.forEach((id, i) => {
   key(S("s13") + 0.2, center("s12"), 1);
   key(S("s13") + 2.6, all, 0.205);
   key(c("So mg sin θ isn't") - 0.1, all, 0.205);
-  key(c("It's just one side"), [center("s06")[0] - 300, center("s06")[1] + 120], 1.25);
-  key(TOTAL, [center("s06")[0] - 260, center("s06")[1] + 140], 1.32);
+  key(c("It's just one side"), [center("s06")[0] - 60, center("s06")[1] + 80], 1.13);
+  key(TOTAL, [center("s06")[0] - 40, center("s06")[1] + 70], 1.15);
 }
 CAM.sort((a, b) => a.t - b.t);
 const cam = document.getElementById("cam");
