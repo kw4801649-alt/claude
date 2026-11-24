@@ -1,0 +1,672 @@
+1
+00:00:01,600 --> 00:00:05,802
+Every force problem in IB Physics comes
+down to two moves: draw the forces,
+
+2
+00:00:05,842 --> 00:00:07,652
+then split them into components.
+
+3
+00:00:07,784 --> 00:00:10,788
+So where does mg sin θ actually come from?
+
+4
+00:00:11,345 --> 00:00:15,138
+In the next few minutes we'll
+derive every contact force you need:
+
+5
+00:00:15,178 --> 00:00:18,837
+the normal force, friction,
+tension, buoyancy and viscous drag.
+
+6
+00:00:18,969 --> 00:00:22,015
+No springs, no circles, no kinematics.
+
+7
+00:00:22,147 --> 00:00:26,079
+Just forces, triangles, and the
+trigonometry that connects them.
+
+8
+00:00:26,900 --> 00:00:29,456
+First, the one tool
+we'll use over and over.
+
+9
+00:00:29,588 --> 00:00:32,254
+A force is an arrow with
+a size and a direction,
+
+10
+00:00:32,294 --> 00:00:36,579
+and any arrow can be replaced by two
+perpendicular arrows that add up to it.
+
+11
+00:00:37,134 --> 00:00:40,668
+Make the force F the hypotenuse
+of a right-angled triangle,
+
+12
+00:00:40,708 --> 00:00:42,465
+at angle θ to the horizontal.
+
+13
+00:00:42,597 --> 00:00:47,550
+Cosine is adjacent over hypotenuse, so
+the side touching the angle is F cos θ.
+
+14
+00:00:47,682 --> 00:00:52,578
+Sine is opposite over hypotenuse, so the
+side across from the angle is F sin θ.
+
+15
+00:00:53,128 --> 00:00:57,126
+Swing the angle and watch: as one
+component grows, the other shrinks,
+
+16
+00:00:57,166 --> 00:00:59,215
+but together they always rebuild F.
+
+17
+00:00:59,347 --> 00:01:02,466
+The rule to remember: cos
+goes with the side touching θ,
+
+18
+00:01:02,506 --> 00:01:04,649
+sin goes with the side across from it.
+
+19
+00:01:05,467 --> 00:01:08,091
+Start simple: a block resting on a table.
+
+20
+00:01:08,223 --> 00:01:10,982
+Its weight, mg, pulls straight down.
+
+21
+00:01:11,114 --> 00:01:13,590
+The table pushes back up
+with the normal force,
+
+22
+00:01:13,630 --> 00:01:15,987
+normal meaning perpendicular
+to the surface.
+
+23
+00:01:16,550 --> 00:01:19,674
+Nothing accelerates, so the
+vertical forces balance,
+
+24
+00:01:19,714 --> 00:01:21,601
+and the normal force equals mg.
+
+25
+00:01:22,148 --> 00:01:24,535
+But these two are not a
+Newton's third law pair.
+
+26
+00:01:24,667 --> 00:01:25,999
+Both act on the block.
+
+27
+00:01:26,131 --> 00:01:29,100
+The partner of the weight is the
+block pulling the Earth upward.
+
+28
+00:01:29,232 --> 00:01:31,548
+And the normal force only equals mg here
+
+29
+00:01:31,588 --> 00:01:34,122
+because nothing else
+is pushing up or down.
+
+30
+00:01:34,933 --> 00:01:38,373
+Now pull the block with a rope
+at angle θ above the horizontal.
+
+31
+00:01:38,506 --> 00:01:44,133
+Split the pull: F cos θ drags the block
+sideways, and F sin θ lifts it a little.
+
+32
+00:01:44,696 --> 00:01:49,952
+Vertically, everything still balances:
+the normal force plus F sin θ equals mg.
+
+33
+00:01:50,084 --> 00:01:53,440
+So the normal force is mg minus F sin θ.
+
+34
+00:01:53,572 --> 00:01:56,066
+Pull harder and the
+surface pushes back less.
+
+35
+00:01:56,631 --> 00:02:01,395
+Push down at the same angle instead, and
+the vertical part adds to the weight:
+
+36
+00:02:01,435 --> 00:02:03,959
+the normal force becomes mg plus F sin θ.
+
+37
+00:02:04,091 --> 00:02:08,268
+Since friction is proportional to the
+normal force, pulling up reduces friction,
+
+38
+00:02:08,308 --> 00:02:09,889
+and pushing down increases it.
+
+39
+00:02:10,700 --> 00:02:14,057
+The normal force is also what you
+feel through your feet in a lift.
+
+40
+00:02:14,189 --> 00:02:17,849
+Accelerating upward, the floor
+must push harder than your weight.
+
+41
+00:02:17,981 --> 00:02:22,198
+Newton's second law gives the
+normal force minus mg equals ma,
+
+42
+00:02:22,238 --> 00:02:24,984
+so the normal force is m times g plus a.
+
+43
+00:02:25,545 --> 00:02:29,101
+Accelerating downward,
+it's m times g minus a.
+
+44
+00:02:29,233 --> 00:02:30,788
+Your weight never changes.
+
+45
+00:02:30,920 --> 00:02:34,208
+Only the contact force does,
+and that's what the scales read.
+
+46
+00:02:35,033 --> 00:02:38,068
+Now the classic: a block
+on a slope at angle θ.
+
+47
+00:02:38,200 --> 00:02:41,970
+Gravity doesn't care about the slope, so
+the weight still points straight down.
+
+48
+00:02:42,102 --> 00:02:45,100
+But the slope can only push
+perpendicular to itself.
+
+49
+00:02:45,661 --> 00:02:49,450
+So tilt your point of view to
+match the slope: one axis along it,
+
+50
+00:02:49,490 --> 00:02:50,903
+one perpendicular to it.
+
+51
+00:02:51,035 --> 00:02:54,254
+Now the weight is the only force
+that isn't lined up with an axis,
+
+52
+00:02:54,294 --> 00:02:55,528
+so it's the one we split.
+
+53
+00:02:56,088 --> 00:02:57,532
+Here's the key geometry.
+
+54
+00:02:57,664 --> 00:03:01,047
+Start with the slope flat: its
+perpendicular points straight down,
+
+55
+00:03:01,087 --> 00:03:02,280
+right along the weight.
+
+56
+00:03:02,412 --> 00:03:04,140
+Now tilt the slope by θ.
+
+57
+00:03:04,272 --> 00:03:07,211
+Its perpendicular tilts
+by exactly the same θ.
+
+58
+00:03:07,343 --> 00:03:10,624
+So the angle between the weight
+and the perpendicular is θ.
+
+59
+00:03:11,179 --> 00:03:12,307
+Read the triangle.
+
+60
+00:03:12,439 --> 00:03:16,940
+The component touching θ, pressing
+into the slope, is mg cos θ.
+
+61
+00:03:17,072 --> 00:03:21,666
+The component across from θ,
+pulling down the slope, is mg sin θ.
+
+62
+00:03:21,798 --> 00:03:25,978
+Nothing moves into the slope, so
+the normal force equals mg cos θ.
+
+63
+00:03:26,539 --> 00:03:27,823
+Check the extremes.
+
+64
+00:03:27,955 --> 00:03:32,252
+At zero degrees, sine is zero and
+cosine is one: no pull along the slope,
+
+65
+00:03:32,292 --> 00:03:34,371
+and the full weight on the surface.
+
+66
+00:03:34,503 --> 00:03:38,258
+At ninety degrees the slope is a
+wall: all of the weight acts along it,
+
+67
+00:03:38,298 --> 00:03:39,634
+and none presses into it.
+
+68
+00:03:40,433 --> 00:03:41,326
+Add friction.
+
+69
+00:03:41,458 --> 00:03:45,678
+Static friction only pushes as
+hard as it needs to, up to a limit:
+
+70
+00:03:45,718 --> 00:03:47,396
+μs times the normal force.
+
+71
+00:03:47,528 --> 00:03:52,064
+On the slope, it exactly matches
+the down-slope pull, mg sin θ.
+
+72
+00:03:52,619 --> 00:03:53,674
+Raise the angle.
+
+73
+00:03:53,806 --> 00:03:59,895
+mg sin θ grows, while the maximum
+friction, μs mg cos θ, shrinks.
+
+74
+00:04:00,027 --> 00:04:01,693
+They meet at the tipping point.
+
+75
+00:04:02,246 --> 00:04:06,957
+Set them equal: mg sin
+θ equals μs mg cos θ.
+
+76
+00:04:07,089 --> 00:04:11,678
+The mass cancels, divide by
+cos θ, and μs equals tan θ.
+
+77
+00:04:11,810 --> 00:04:16,032
+Measure the angle where a block just
+starts to slip, and you've measured μs.
+
+78
+00:04:16,583 --> 00:04:20,607
+Once it slides, friction drops
+to μd times the normal force,
+
+79
+00:04:20,647 --> 00:04:25,253
+so the resultant force down the
+slope is mg sin θ minus μd mg cos θ.
+
+80
+00:04:26,067 --> 00:04:27,074
+A trickier one.
+
+81
+00:04:27,206 --> 00:04:30,496
+Hold a block on a smooth slope
+with a horizontal push F.
+
+82
+00:04:30,628 --> 00:04:34,309
+Now F isn't lined up with either
+axis, so it gets split too.
+
+83
+00:04:34,866 --> 00:04:37,688
+The angle between F and
+the slope is also θ.
+
+84
+00:04:37,820 --> 00:04:42,508
+So F cos θ pushes up along the
+slope, and F sin θ presses into it.
+
+85
+00:04:43,065 --> 00:04:49,618
+Along the slope, F cos θ balances
+mg sin θ, so F equals mg tan θ.
+
+86
+00:04:49,750 --> 00:04:54,276
+Perpendicular to the slope, the
+normal force must balance both:
+
+87
+00:04:54,316 --> 00:04:55,911
+mg cos θ plus F sin θ.
+
+88
+00:04:56,043 --> 00:04:59,745
+The push adds to the normal force, so it
+can even end up bigger than the weight.
+
+89
+00:05:00,567 --> 00:05:04,264
+Tension is a pull along a string,
+directed away from the object.
+
+90
+00:05:04,396 --> 00:05:08,061
+Hang a mass from a single string
+and the tension equals mg.
+
+91
+00:05:08,617 --> 00:05:12,677
+Now hang a lamp from two strings,
+each at angle α to the horizontal.
+
+92
+00:05:12,809 --> 00:05:17,418
+Split each tension: T cos α
+sideways, and T sin α upward.
+
+93
+00:05:17,550 --> 00:05:19,127
+The sideways parts cancel.
+
+94
+00:05:19,259 --> 00:05:23,636
+The upward parts share the
+weight: two T sin α equals mg,
+
+95
+00:05:23,676 --> 00:05:26,002
+so T equals mg over two sin α.
+
+96
+00:05:26,553 --> 00:05:30,726
+Flatten the strings and watch: as
+α shrinks, sin α heads toward zero,
+
+97
+00:05:30,766 --> 00:05:32,354
+and the tension shoots up.
+
+98
+00:05:32,486 --> 00:05:35,468
+That's why you can never pull a
+washing line perfectly straight.
+
+99
+00:05:36,035 --> 00:05:40,938
+With unequal angles, balance each
+direction separately: sideways,
+
+100
+00:05:40,978 --> 00:05:44,513
+T one cos α one equals
+T two cos α two; upward,
+
+101
+00:05:44,553 --> 00:05:48,128
+T one sin α one plus T
+two sin α two equals mg.
+
+102
+00:05:48,260 --> 00:05:50,833
+Two equations, two unknown tensions.
+
+103
+00:05:50,965 --> 00:05:54,233
+Or slide the three forces
+nose to tail: in equilibrium,
+
+104
+00:05:54,273 --> 00:05:55,898
+they close into a triangle.
+
+105
+00:05:56,700 --> 00:06:01,764
+Over a light, smooth pulley, tension
+keeps its size and only changes direction.
+
+106
+00:06:01,896 --> 00:06:04,313
+Tie a block on a table to a hanging mass.
+
+107
+00:06:04,445 --> 00:06:08,073
+The same tension pulls the block
+sideways and holds the hanging mass up.
+
+108
+00:06:08,616 --> 00:06:12,189
+For the hanging mass,
+mg minus T equals ma.
+
+109
+00:06:12,321 --> 00:06:14,774
+For the block, T equals M a.
+
+110
+00:06:14,906 --> 00:06:17,997
+The string links them, so they
+share the same acceleration.
+
+111
+00:06:18,130 --> 00:06:21,963
+And while it accelerates, the tension
+is always less than the hanging weight.
+
+112
+00:06:22,767 --> 00:06:24,362
+Now put a block in a fluid.
+
+113
+00:06:24,494 --> 00:06:26,171
+Fluid pressure grows with depth,
+
+114
+00:06:26,211 --> 00:06:30,074
+so the bottom face is pushed up harder
+than the top face is pushed down.
+
+115
+00:06:30,206 --> 00:06:31,950
+The pushes on the sides cancel.
+
+116
+00:06:32,082 --> 00:06:33,599
+The difference is buoyancy.
+
+117
+00:06:34,145 --> 00:06:37,689
+The extra pressure across the
+block's height h is ρ g h,
+
+118
+00:06:37,729 --> 00:06:39,394
+acting on the face area A.
+
+119
+00:06:39,526 --> 00:06:44,593
+So the buoyant force is ρ g h A,
+and since h times A is the volume,
+
+120
+00:06:44,633 --> 00:06:45,624
+that's ρ V g.
+
+121
+00:06:45,756 --> 00:06:50,279
+Here ρ is the fluid's density, and V
+is the volume of fluid pushed aside.
+
+122
+00:06:50,411 --> 00:06:53,885
+It's exactly the weight of the
+fluid that used to fill that space.
+
+123
+00:06:54,435 --> 00:06:58,991
+A floating object sinks until it
+pushes aside its own weight of fluid:
+
+124
+00:06:59,031 --> 00:07:02,118
+ρ times the submerged
+volume times g equals mg.
+
+125
+00:07:02,933 --> 00:07:05,306
+Move through a fluid, and it drags back.
+
+126
+00:07:05,438 --> 00:07:09,541
+For a small sphere moving slowly
+through smooth, layered flow,
+
+127
+00:07:09,581 --> 00:07:12,254
+Stokes' law gives the drag: six π η r v.
+
+128
+00:07:12,386 --> 00:07:13,659
+It grows with speed.
+
+129
+00:07:14,206 --> 00:07:15,885
+Drop a ball bearing into oil.
+
+130
+00:07:16,017 --> 00:07:19,029
+Weight pulls down;
+buoyancy and drag push up.
+
+131
+00:07:19,162 --> 00:07:20,961
+As it speeds up, the drag grows,
+
+132
+00:07:21,001 --> 00:07:24,103
+until the forces balance and
+the speed stops changing.
+
+133
+00:07:24,235 --> 00:07:25,492
+That's terminal speed.
+
+134
+00:07:26,054 --> 00:07:27,270
+Write the balance:
+
+135
+00:07:27,310 --> 00:07:32,051
+mg equals the buoyant force plus
+six π η r times the terminal speed.
+
+136
+00:07:32,183 --> 00:07:36,781
+Replace each mass with density times
+four thirds π r cubed, and solve.
+
+137
+00:07:36,913 --> 00:07:41,498
+The terminal speed is two r squared
+g, times the density difference,
+
+138
+00:07:41,538 --> 00:07:42,354
+over nine η.
+
+139
+00:07:43,200 --> 00:07:45,903
+Every contact force
+follows the same recipe.
+
+140
+00:07:46,035 --> 00:07:49,293
+Isolate the object, and draw
+only the forces acting on it.
+
+141
+00:07:49,425 --> 00:07:51,535
+Choose axes that match the surface.
+
+142
+00:07:51,668 --> 00:07:55,874
+Split each force with its triangle:
+cos for the side touching the angle,
+
+143
+00:07:55,914 --> 00:07:57,329
+sin for the side across.
+
+144
+00:07:57,461 --> 00:07:59,049
+Then balance each direction.
+
+145
+00:07:59,600 --> 00:08:02,873
+So mg sin θ isn't a formula to memorise.
+
+146
+00:08:03,005 --> 00:08:04,877
+It's just one side of a triangle.

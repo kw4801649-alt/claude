@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Contact Forces, Derived — worksheet</title>
+<!--
+  scene/index.html: "Contact Forces, Derived" (IB Physics SL, A.2)
+
+  One long sheet of graph paper. The camera glides from diagram to diagram (and once
+  turns the paper so a slope becomes level); every vector is pen-drawn in its own
+  colour, angles move, blocks slip and strings flatten, and the equations, typeset with
+  KaTeX, write themselves exactly when the narrator says them.
+
+  Timing: audio/timings.json (from tools/tts.py) holds every spoken sentence;
+  cue(scene, "phrase") gives the moment a phrase is spoken.
+  Determinism: every frame is a pure function of t (no clocks, no randomness).
+  Served by render/serve.mjs: /scene/index.html (render), ?preview=1 (scrub+audio), ?t=95 (still)
+-->
+<link rel="stylesheet" href="/node_modules/katex/dist/katex.min.css">
+<style>
+  @font-face { font-family: "Hand"; font-weight: 600; src: url("/node_modules/@fontsource/caveat/files/caveat-latin-600-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Hand"; font-weight: 700; src: url("/node_modules/@fontsource/caveat/files/caveat-latin-700-normal.woff2") format("woff2"); }
+  html, body { margin: 0; padding: 0; background: #f4efe4; overflow: hidden; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0; background: #f4efe4; }
+  svg#sheet { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+  .fo { display: flex; align-items: center; line-height: 1; white-space: nowrap; }
+  .fo .katex { font-size: 1em; }
+  #fade { position: absolute; inset: 0; background: #f4efe4; opacity: 1; pointer-events: none; }
+  #err { position: absolute; inset: 0; color: #b00; font: 28px/1.4 monospace; padding: 80px; display: none; }
+  #controls { position: fixed; left: 0; right: 0; bottom: 0; display: none; gap: 12px; align-items: center; padding: 10px 16px;
+              background: rgba(35,32,28,0.92); color: #fff; font: 14px/1.2 system-ui, sans-serif; }
+  #controls input[type=range] { flex: 1; }
+  #controls button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 0; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <svg id="sheet" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+        <path d="M60 0H0V60" fill="none" stroke="#e2d9c6" stroke-width="2"/>
+      </pattern>
+      <pattern id="hatch" width="22" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="22" stroke="#bfb4a1" stroke-width="3"/>
+      </pattern>
+    </defs>
+    <g id="cam"><rect id="paper" x="-4000" y="-3000" width="16000" height="10000" fill="url(#grid)"/><g id="world"></g></g>
+  </svg>
+  <div id="fade"></div>
+  <div id="err"></div>
+</div>
+<div id="controls">
+  <button id="play">Play</button>
+  <input id="scrub" type="range" min="0" max="500" step="0.0333" value="0">
+  <span id="clock">0:00.0</span>
+</div>
+
+<script type="module">
+import katex from "/node_modules/katex/dist/katex.mjs";
+
+/* ========================================================== timeline from the narration */
+const params = new URLSearchParams(location.search);
+const PREVIEW = params.has("preview");
+const fail = msg => { const e = document.getElementById("err"); e.style.display = "block"; e.textContent = msg; throw new Error(msg); };
+const CFG = await (await fetch("/config/scenes.json")).json();
+const tlRes = await fetch("/audio/timings.json");
+if (!tlRes.ok) fail("audio/timings.json not found. Run `python tools/tts.py` first: the scene is timed to the narration.");
+const TL = await tlRes.json();
+const TOTAL = TL.total;
+const SC = {};
+for (const s of CFG.scenes) { const t = TL.scenes[s.id]; if (!t) fail(`timings.json has no ${s.id}; re-run tools/tts.py`); SC[s.id] = { start: t.start, end: t.start + t.slot, t }; }
+const S = id => SC[id].start, E = id => SC[id].end;
+function cue(id, phrase, { nth = 1, at = "start" } = {}) {
+  const p = phrase.toLowerCase(); let count = 0;
+  for (const seg of SC[id].t.segments) for (const s of seg.sentences) {
+    const txt = s.text.toLowerCase(); let from = 0, idx;
+    while ((idx = txt.indexOf(p, from)) >= 0) {
+      if (++count === nth) { const k = (at === "end" ? idx + p.length : idx) / txt.length; return SC[id].start + s.start + k * (s.end - s.start); }
+      from = idx + 1;
+    }
+  }
+  fail(`Narration cue not found: ${id} "${phrase}" #${nth}`);
+}
+
+/* ========================================================== math */
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const smooth = (e0, e1, x) => { const k = clamp((x - e0) / (e1 - e0)); return k * k * (3 - 2 * k); };
+const ease = k => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const D2R = Math.PI / 180;
+const ap = (t, t0, d = 0.45) => smooth(t0, t0 + d, t);                 // appear
+const win = (t, a, b, fi = 0.45, fo = 0.45) => Math.min(smooth(a, a + fi, t), 1 - smooth(b - fo, b, t));
+function track(keys) {
+  keys = keys.slice().sort((a, b) => a[0] - b[0]);
+  return t => {
+    if (t <= keys[0][0]) return keys[0][1];
+    for (let i = 0; i < keys.length - 1; i++) { const [t0, v0] = keys[i], [t1, v1] = keys[i + 1]; if (t < t1) return t1 - t0 < 1e-6 ? v1 : lerp(v0, v1, ease((t - t0) / (t1 - t0))); }
+    return keys[keys.length - 1][1];
+  };
+}
+const fmt = (x, d = 2) => x.toFixed(d);
+
+/* ========================================================== drawing kit (SVG + KaTeX) */
+const NS = "http://www.w3.org/2000/svg";
+const INK = "#23201c", PAPER = "#f4efe4", MUTED = "#8a8276";
+const COL = { W: "#e0701b", N: "#0f8f86", FR: "#c2305f", T: "#4f8a1f", F: "#3346c8", B: "#1d7bd8", D: "#8a3fd1", A: "#7a7368" };
+function el(tag, attrs = {}, parent = null) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function set(e, attrs) { for (const k in attrs) e.setAttribute(k, attrs[k]); }
+const world = document.getElementById("world");
+
+/** A force arrow. draw(x1,y1,x2,y2,{p (grow 0..1), op, dash}) */
+function arrow(parent, color, w = 7) {
+  const g = el("g", {}, parent);
+  const line = el("line", { stroke: color, "stroke-width": w, "stroke-linecap": "round" }, g);
+  const head = el("path", { fill: color }, g);
+  return {
+    g, draw(x1, y1, x2, y2, { p = 1, op = 1, dash = null } = {}) {
+      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy), L = len * p;
+      if (op < 0.005 || L < 2) { g.setAttribute("opacity", 0); return; }
+      const ux = dx / len, uy = dy / len, hl = Math.min(w * 4.2, L * 0.5), hw = w * 2.3;
+      const ex = x1 + ux * L, ey = y1 + uy * L, bx = ex - ux * hl, by = ey - uy * hl;
+      set(line, { x1, y1, x2: bx, y2: by, "stroke-dasharray": dash || "none" });
+      set(head, { d: `M${ex},${ey}L${bx - uy * hw},${by + ux * hw}L${bx + uy * hw},${by - ux * hw}Z` });
+      g.setAttribute("opacity", op);
+    } };
+}
+/** A pen line that draws itself (p 0..1). */
+function pen(parent, color = INK, w = 4, extra = {}) {
+  const e = el("line", { stroke: color, "stroke-width": w, "stroke-linecap": "round", fill: "none", ...extra }, parent);
+  return { e, draw(x1, y1, x2, y2, p = 1, op = 1) { const L = Math.hypot(x2 - x1, y2 - y1); set(e, { x1, y1, x2, y2, opacity: op }); if (!extra["stroke-dasharray"]) set(e, { "stroke-dasharray": `${L} ${L + 1}`, "stroke-dashoffset": L * (1 - clamp(p)) }); } };
+}
+function poly(parent, attrs) { const e = el("path", attrs, parent); return { e, draw(pts, op = 1, close = true) { e.setAttribute("d", "M" + pts.map(p => `${p[0]},${p[1]}`).join("L") + (close ? "Z" : "")); e.setAttribute("opacity", op); } }; }
+/** KaTeX math. at(x, y, op, {anchor:'c'|'l'|'r', rot, scale}) */
+function tex(parent, src, { size = 46, color = INK, w = 1100, h = 170 } = {}) {
+  const g = el("g", {}, parent);
+  const fo = el("foreignObject", { width: w, height: h, y: -h / 2 }, g);
+  const div = document.createElement("div");
+  div.className = "fo"; div.style.width = w + "px"; div.style.height = h + "px"; div.style.fontSize = size + "px"; div.style.color = color;
+  div.innerHTML = katex.renderToString(src, { throwOnError: true, strict: false });
+  fo.appendChild(div);
+  return { g, div, at(x, y, op = 1, { anchor = "c", rot = 0, scale = 1, dy = 0 } = {}) {
+    if (op < 0.005) { g.setAttribute("opacity", 0); return; }
+    div.style.justifyContent = anchor === "l" ? "flex-start" : anchor === "r" ? "flex-end" : "center";
+    fo.setAttribute("x", anchor === "l" ? 0 : anchor === "r" ? -w : -w / 2);
+    g.setAttribute("transform", `translate(${x},${y + dy}) rotate(${rot}) scale(${scale})`);
+    g.setAttribute("opacity", op);
+  } };
+}
+/** Handwriting (Caveat) that writes itself letter by letter. */
+function hand(parent, text, { size = 52, color = INK, anchor = "start", weight = 600 } = {}) {
+  const e = el("text", { "font-family": "Hand", "font-weight": weight, "font-size": size, fill: color, "text-anchor": anchor }, parent);
+  return { e, write(x, y, t, t0, { op = 1, speed = 0.035, txt = text, rot = 0 } = {}) {
+    const n = Math.floor(txt.length * clamp((t - t0) / Math.max(0.2, txt.length * speed)));
+    if (t < t0 || op < 0.005) { e.setAttribute("opacity", 0); return; }
+    e.textContent = txt.slice(0, n); set(e, { x, y, opacity: op, transform: rot ? `rotate(${rot} ${x} ${y})` : "" });
+  } };
+}
+/** Angle arc between screen directions a0..a1 (degrees, clockwise from +x on screen). */
+function arc(parent, color = INK, w = 3.5) {
+  const e = el("path", { stroke: color, "stroke-width": w, fill: "none", "stroke-linecap": "round" }, parent);
+  return { e, draw(cx, cy, r, a0, a1, op = 1) {
+    if (op < 0.005 || Math.abs(a1 - a0) < 0.3) { e.setAttribute("opacity", 0); return; }
+    const p0 = [cx + r * Math.cos(a0 * D2R), cy + r * Math.sin(a0 * D2R)], p1 = [cx + r * Math.cos(a1 * D2R), cy + r * Math.sin(a1 * D2R)];
+    const sweep = a1 > a0 ? 1 : 0, large = Math.abs(a1 - a0) > 180 ? 1 : 0;
+    set(e, { d: `M${p0[0]},${p0[1]}A${r},${r} 0 ${large} ${sweep} ${p1[0]},${p1[1]}`, opacity: op });
+  } };
+}
+/** Right-angle mark at corner c with unit directions u, v (screen). */
+function rightMark(parent, color = INK) {
+  const e = el("path", { stroke: color, "stroke-width": 3, fill: "none" }, parent);
+  return { draw(c, u, v, s = 26, op = 1) { const a = [c[0] + u[0] * s, c[1] + u[1] * s], b = [a[0] + v[0] * s, a[1] + v[1] * s], d = [c[0] + v[0] * s, c[1] + v[1] * s]; set(e, { d: `M${a[0]},${a[1]}L${b[0]},${b[1]}L${d[0]},${d[1]}`, opacity: op }); } };
+}
+/** A rectangle "block" centred at (x, y), rotated rot degrees (screen). */
+function block(parent, w, h, { fill = "#fbf7ef", stroke = INK } = {}) {
+  const e = el("rect", { width: w, height: h, x: -w / 2, y: -h / 2, rx: 6, fill, stroke, "stroke-width": 4 }, parent);
+  return { e, at(x, y, rot = 0, op = 1) { set(e, { transform: `translate(${x},${y}) rotate(${rot})`, opacity: op }); } };
+}
+/** Equation stack: lines appear on cue; a pen underline marks results. */
+function eqs(parent, x, y, items, { size = 46, gap = 100 } = {}) {
+  const lines = items.map((it, i) => ({ ...it, m: tex(parent, it.tex, { size: it.size || size, color: it.color || INK }), y: it.y ?? y + i * gap,
+    ul: it.final ? pen(parent, it.ulColor || COL.FR, 4) : null }));
+  return t => { for (const L of lines) {
+    const k = ap(t, L.t, 0.4) * (L.until ? 1 - ap(t, L.until, 0.4) : 1);
+    L.m.at(x + (L.dx || 0), L.y, k, { anchor: "l", dy: (1 - k) * 12 });
+    if (L.ul) L.ul.draw(x + (L.dx || 0) - 6, L.y + 40, x + (L.dx || 0) + (L.ulw || 420), L.y + 40, ap(t, L.t + 0.5, 0.6), k);
+  } };
+}
+const unit = a => [Math.cos(a * D2R), Math.sin(a * D2R)];   // screen angle, clockwise from +x
+const add = (p, v, s = 1) => [p[0] + v[0] * s, p[1] + v[1] * s];
+
+/* ========================================================== the sheet layout */
+const PW = 2300, PH = 1500;
+const POS = { s01: [0, 0], s02: [1, 0], s03: [2, 0], s04: [3, 0], s05: [3, 1], s06: [2, 1], s07: [1, 1], s08: [0, 1], s09: [0, 2], s10: [1, 2], s11: [2, 2], s12: [3, 2] };
+const center = id => [POS[id][0] * PW, POS[id][1] * PH];
+const SECS = [];
+function section(id, build) {
+  const [cx, cy] = center(id);
+  const g = el("g", { transform: `translate(${cx},${cy})` }, world);
+  const c = (p, o) => cue(id, p, o);
+  SECS.push({ id, g, update: build(g, c, id) });
+}
+/** Little handwritten section heading in the corner of each panel (part of the page, not an interface bar). */
+function heading(g, num, text, t0) {
+  const h = hand(g, `${num}  ${text}`, { size: 58, color: MUTED, weight: 700 });
+  const u = pen(g, MUTED, 3);
+  return t => { h.write(-880, -440, t, t0, { speed: 0.02 }); u.draw(-884, -420, -884 + 26 * (num.length + text.length + 2) * 0.62 * 58 / 52, -420, ap(t, t0 + 0.4, 0.8), 0.7); };
+}
+
+/* incline helper: pivot P0, slope length L, angle th (deg, rising to the right) */
+function incline(g, { L = 1150, fillOp = 1 } = {}) {
+  const body = poly(g, { fill: "url(#hatch)", stroke: INK, "stroke-width": 4, "stroke-linejoin": "round" });
+  const base = arc(g, INK, 3.5), thL = tex(g, "\\theta", { size: 44 });
+  return (P0, th, op = 1) => {
+    const u = [Math.cos(th * D2R), -Math.sin(th * D2R)], n = [-Math.sin(th * D2R), -Math.cos(th * D2R)];
+    const top = add(P0, u, L), foot = [P0[0] + L * Math.cos(th * D2R), P0[1]];
+    body.draw([P0, top, foot], op);
+    base.draw(P0[0], P0[1], 110, -th, 0, op * (th > 2 ? 1 : 0));
+    thL.at(P0[0] + 150 * Math.cos(th / 2 * D2R), P0[1] - 150 * Math.sin(th / 2 * D2R), op * (th > 4 ? 1 : 0));
+    return { u, n };
+  };
+}
+
+/* ========================================================== s01 — the question */
+section("s01", (g, c) => {
+  const title = hand(g, "Contact forces, derived", { size: 170, anchor: "middle", weight: 700 });
+  const sub = hand(g, "IB Physics SL · A.2 Forces", { size: 64, anchor: "middle", color: MUTED });
+  const inc = incline(g, { L: 700 });
+  const blk = block(g, 150, 96);
+  const W = arrow(g, COL.W, 7), cA = arrow(g, COL.W, 5), cB = arrow(g, COL.W, 5);
+  const mgL = tex(g, "mg", { size: 46, color: COL.W }), qA = tex(g, "mg\\sin\\theta\\;?", { size: 50, color: COL.W }), qB = tex(g, "mg\\cos\\theta\\;?", { size: 50, color: COL.W });
+  const icons = ["normal force", "friction", "tension", "buoyancy", "viscous drag"].map((name, i) => {
+    const ig = el("g", {}, g); const x = -760 + i * 300, y = 400;
+    const lab = hand(ig, name, { size: 46, anchor: "middle" });
+    return { name, ig, x, y, lab, a: arrow(ig, [COL.N, COL.FR, COL.T, COL.B, COL.D][i], 6), b: block(ig, 90, 64), l: pen(ig, INK, 4), w: el("rect", { x: x - 90, y: y - 130, width: 180, height: 150, fill: "#cfe4f5", opacity: 0 }, ig),
+      ball: el("circle", { r: 34, fill: "#fbf7ef", stroke: INK, "stroke-width": 4, opacity: 0 }, ig) };
+  });
+  const nos = ["springs", "circles", "kinematics"].map((n, i) => ({ h: hand(g, `no ${n}`, { size: 58, color: INK }), s: pen(g, COL.FR, 6) }));
+  return t => {
+    title.write(0, -320, t, 0.4, { speed: 0.04 }); sub.write(0, -235, t, 1.6, { speed: 0.03, op: 1 });
+    const P0 = [-560, 130], th = 30, { u, n } = inc(P0, th, ap(t, 2.0, 0.8));
+    const C = add(add(P0, u, 380), n, 48);
+    blk.at(C[0], C[1], -th, ap(t, 2.3, 0.6));
+    const wp = ap(t, c("draw the forces"), 0.7);
+    W.draw(C[0], C[1], C[0], C[1] + 240, { p: wp }); mgL.at(C[0] + 52, C[1] + 230, wp);
+    const q = ap(t, c("where does mg sin θ"), 0.7), Lw = 240;
+    const nIn = [-n[0], -n[1]], uDn = [-u[0], -u[1]];
+    cA.draw(C[0], C[1], ...add(C, uDn, Lw * Math.sin(th * D2R)), { p: q, dash: "14 10" });
+    cB.draw(C[0], C[1], ...add(C, nIn, Lw * Math.cos(th * D2R)), { p: q, dash: "14 10" });
+    qA.at(...add(add(C, uDn, Lw * 0.5 + 40), [0, -40]), q * (1 - 0.6 * ap(t, c("In the next few"))), { anchor: "r" });
+    qB.at(...add(add(C, nIn, Lw * 0.87), [190, -10]), q * (1 - 0.6 * ap(t, c("In the next few"))));
+    const words = ["the normal force", "friction", "tension", "buoyancy", "viscous drag"];
+    icons.forEach((ic, i) => {
+      const k = ap(t, c(words[i]), 0.5), { x, y } = ic;
+      ic.lab.write(x, y + 80, t, c(words[i]), { op: k });
+      ic.l.draw(x - 90, y, x + 90, y, k, i === 3 || i === 4 ? 0 : 1);
+      if (i === 0) { ic.b.at(x, y - 32, 0, k); ic.a.draw(x, y - 32, x, y - 170, { p: k }); }
+      if (i === 1) { ic.b.at(x, y - 32, 0, k); ic.a.draw(x, y - 4, x - 120, y - 4, { p: k }); }
+      if (i === 2) { ic.l.draw(x - 60, y - 210, x + 60, y - 210, k); ic.b.at(x, y - 60, 0, k); ic.a.draw(x, y - 92, x, y - 200, { p: k }); }
+      if (i === 3) { set(ic.w, { opacity: 0.8 * k }); ic.b.at(x, y - 50, 0, k); ic.a.draw(x, y - 50, x, y - 170, { p: k }); }
+      if (i === 4) { ic.b.at(x, y, 0, 0); set(ic.ball, { cx: x, cy: y - 40, opacity: k }); ic.a.draw(x, y - 74, x, y - 180, { p: k }); }
+    });
+    ["springs", "circles", "kinematics"].forEach((w, i) => {
+      const t0 = c(i === 0 ? "No springs" : i === 1 ? "no circles" : "no kinematics"), y = -100 + i * 95;
+      nos[i].h.write(480, y, t, t0, { speed: 0.02 });
+      nos[i].s.draw(470, y - 16, 470 + 40 + w.length * 26 + 60, y - 22, ap(t, t0 + 0.4, 0.35), ap(t, t0));
+    });
+  };
+});
+
+/* ========================================================== s02 — resolving a force */
+section("s02", (g, c, id) => {
+  const H = heading(g, "①", "the one tool: resolving a force", S(id));
+  const O = [-720, 300], L = 640;
+  const swing0 = c("Swing the angle"), swing1 = c("The rule to remember");
+  const th = t => 35 + 24 * Math.sin((t - swing0) * 2 * Math.PI / 4.2) * win(t, swing0 + 0.3, swing1 - 0.2, 0.8, 0.8);
+  const F = arrow(g, COL.F, 8), Fx = arrow(g, COL.F, 5), Fy = arrow(g, COL.F, 5);
+  const rm = rightMark(g), an = arc(g), thL = tex(g, "\\theta", { size: 46 }), FL = tex(g, "F", { size: 52, color: COL.F });
+  const hyp = hand(g, "hypotenuse", { size: 50, color: MUTED }), adj = hand(g, "adjacent (touching θ)", { size: 50, color: MUTED }), opp = hand(g, "opposite", { size: 50, color: MUTED, anchor: "start" });
+  const FxL = tex(g, "F\\cos\\theta", { size: 50, color: COL.F }), FyL = tex(g, "F\\sin\\theta", { size: 50, color: COL.F });
+  const read = hand(g, "", { size: 50, color: COL.F });
+  const E1 = eqs(g, 160, -300, [
+    { tex: "\\cos\\theta = \\dfrac{\\text{adjacent}}{\\text{hypotenuse}}", t: c("Cosine is adjacent") },
+    { tex: "\\Rightarrow\\ \\text{adjacent} = F\\cos\\theta", t: c("the side touching the angle is"), final: true, ulw: 500, ulColor: COL.F },
+    { tex: "\\sin\\theta = \\dfrac{\\text{opposite}}{\\text{hypotenuse}}", t: c("Sine is opposite"), y: -40 },
+    { tex: "\\Rightarrow\\ \\text{opposite} = F\\sin\\theta", t: c("the side across from the angle is"), y: 70, final: true, ulw: 500, ulColor: COL.F },
+    { tex: "(F\\cos\\theta)^2 + (F\\sin\\theta)^2 = F^2", t: c("together they always rebuild F"), y: 200, size: 42 },
+  ], { gap: 110 });
+  const rule = hand(g, "cos → the side touching θ   ·   sin → the side across", { size: 58, color: INK, weight: 700 });
+  return t => {
+    H(t);
+    const a = th(t), k = ap(t, c("A force is an arrow"), 0.8), comp = ap(t, c("replaced by two perpendicular"), 0.7);
+    const tip = [O[0] + L * Math.cos(a * D2R), O[1] - L * Math.sin(a * D2R)], corner = [tip[0], O[1]];
+    F.draw(O[0], O[1], tip[0], tip[1], { p: k }); FL.at(...add(tip, [30, -30]), k);
+    Fx.draw(O[0], O[1], corner[0], corner[1], { p: comp, dash: "16 11" });
+    Fy.draw(corner[0], corner[1], tip[0], tip[1], { p: comp, dash: "16 11" });
+    const tri = ap(t, c("Make the force F"), 0.6);
+    rm.draw(corner, [-1, 0], [0, -1], 30, tri); an.draw(O[0], O[1], 120, -a, 0, tri); thL.at(O[0] + 165 * Math.cos(a / 2 * D2R), O[1] - 165 * Math.sin(a / 2 * D2R), tri);
+    hyp.write((O[0] + tip[0]) / 2 - 230, (O[1] + tip[1]) / 2 - 20, t, c("hypotenuse"), { op: 1 - ap(t, swing0, 0.5) });
+    const adjOn = c("Cosine is adjacent"), oppOn = c("Sine is opposite");
+    adj.write(O[0] + 20, O[1] + 70, t, adjOn, { op: 1 - ap(t, c("the side touching the angle is"), 0.4) });
+    FxL.at((O[0] + corner[0]) / 2, O[1] + 60, ap(t, c("the side touching the angle is"), 0.5));
+    opp.write(corner[0] + 24, (corner[1] + tip[1]) / 2, t, oppOn, { op: 1 - ap(t, c("the side across from the angle is"), 0.4) });
+    FyL.at(corner[0] + 40, (corner[1] + tip[1]) / 2, ap(t, c("the side across from the angle is"), 0.5), { anchor: "l" });
+    E1(t);
+    const sw = win(t, swing0 + 0.2, swing1, 0.4, 0.4);
+    read.write(160, 330, t, swing0 + 0.2, { op: sw, speed: 0.001, txt: `θ = ${Math.round(a)}°   cos θ = ${fmt(Math.cos(a * D2R))}   sin θ = ${fmt(Math.sin(a * D2R))}` });
+    rule.write(-880, 470, t, swing1 + 0.2, { speed: 0.022 });
+  };
+});
+
+/* ========================================================== s03 — normal force, flat surface */
+section("s03", (g, c, id) => {
+  const H = heading(g, "②", "normal force on a flat surface", S(id));
+  const table = pen(g, INK, 6), hatch = el("rect", { x: -840, y: 150, width: 880, height: 40, fill: "url(#hatch)", opacity: 0 }, g);
+  const blk = block(g, 260, 190), C = [-300, 55];
+  const W = arrow(g, COL.W, 8), N = arrow(g, COL.N, 8), mgL = tex(g, "mg", { size: 52, color: COL.W }), NL = tex(g, "F_N", { size: 52, color: COL.N });
+  const perp = pen(g, COL.N, 3, { "stroke-dasharray": "10 8" }), rm = rightMark(g, COL.N);
+  const E1 = eqs(g, 200, -260, [
+    { tex: "\\Sigma F_y = 0", t: c("vertical forces balance") },
+    { tex: "F_N - mg = 0", t: c("vertical forces balance") + 0.9 },
+    { tex: "F_N = mg", t: c("the normal force equals mg"), final: true, ulw: 260, ulColor: COL.N },
+  ], { gap: 105 });
+  const n1 = hand(g, "✗ not a Newton's 3rd-law pair", { size: 56, color: COL.FR, weight: 700 });
+  const n2 = hand(g, "both act ON the block", { size: 52, color: INK });
+  const earth = el("path", { d: "M-900,520 Q-300,380 300,520", stroke: INK, "stroke-width": 5, fill: "#e9e1d0", opacity: 0 }, g);
+  const eL = hand(g, "Earth", { size: 46, color: MUTED });
+  const WE = arrow(g, COL.W, 6), weL = hand(g, "block pulls Earth up (the real partner)", { size: 44, color: COL.W });
+  const n3 = hand(g, "F_N = mg only because nothing else pushes up or down", { size: 48, color: INK });
+  return t => {
+    H(t);
+    const k0 = ap(t, S(id) + 0.3, 0.9);
+    table.draw(-840, 150, 40, 150, k0); set(hatch, { opacity: k0 }); blk.at(C[0], C[1], 0, ap(t, c("a block resting")));
+    const w = ap(t, c("Its weight, mg"), 0.6), n = ap(t, c("normal force"), 0.6);
+    W.draw(C[0], C[1], C[0], C[1] + 290, { p: w }); mgL.at(C[0] + 60, C[1] + 280, w);
+    N.draw(C[0], C[1], C[0], C[1] - 290, { p: n }); NL.at(C[0] + 60, C[1] - 280, n);
+    const pk = ap(t, c("perpendicular to the surface"), 0.5) * (1 - ap(t, c("Nothing accelerates"), 0.6));
+    perp.draw(C[0] + 160, 150, C[0] + 160, -20, pk, pk); rm.draw([C[0] + 160, 150], [1, 0], [0, -1], 28, pk);
+    E1(t);
+    n1.write(200, 90, t, c("not a Newton's third law pair"), { speed: 0.02 });
+    n2.write(200, 165, t, c("Both act on the block"), { speed: 0.02 });
+    const e = ap(t, c("partner of the weight"), 0.6);
+    set(earth, { opacity: e }); eL.write(-880, 500, t, c("partner of the weight"), { op: e });
+    WE.draw(-60, 470, -60, 330, { p: e, dash: "14 10" }); weL.write(-20, 420, t, c("partner of the weight") + 0.4, { speed: 0.02 });
+    n3.write(-880, -330, t, c("only equals mg here"), { speed: 0.018 });
+  };
+});
+
+/* ========================================================== s04 — pulled / pushed at an angle */
+section("s04", (g, c, id) => {
+  const H = heading(g, "③", "pulled or pushed at an angle", S(id));
+  const floor = pen(g, INK, 6), hatch = el("rect", { x: -880, y: 170, width: 1100, height: 40, fill: "url(#hatch)" }, g);
+  const blk = block(g, 260, 190), C = [-330, 75];
+  const W = arrow(g, COL.W, 8), N = arrow(g, COL.N, 8), Fp = arrow(g, COL.F, 8), Fx = arrow(g, COL.F, 5), Fy = arrow(g, COL.F, 5), Fr = arrow(g, COL.FR, 8);
+  const rope = pen(g, MUTED, 4);
+  const mgL = tex(g, "mg", { size: 50, color: COL.W }), NL = tex(g, "F_N", { size: 50, color: COL.N }), FL = tex(g, "F", { size: 52, color: COL.F }),
+    FxL = tex(g, "F\\cos\\theta", { size: 44, color: COL.F }), FyL = tex(g, "F\\sin\\theta", { size: 44, color: COL.F }), FrL = tex(g, "F_f = \\mu F_N", { size: 44, color: COL.FR });
+  const an = arc(g), thL = tex(g, "\\theta", { size: 42 });
+  const mode = track([[0, 0], [c("Push down at the same angle"), 0], [c("Push down at the same angle") + 1.2, 1], [c("pulling up reduces"), 1], [c("pulling up reduces") + 1, 0], [c("pushing down increases"), 0], [c("pushing down increases") + 1, 1]]);
+  const mag = track([[0, 1], [c("Pull harder"), 1], [c("Pull harder") + 1.5, 1.45], [c("Push down at the same angle"), 1.45], [c("Push down at the same angle") + 1, 1]]);
+  const E1 = eqs(g, 230, -330, [
+    { tex: "F_N + F\\sin\\theta = mg", t: c("the normal force plus F sin θ") },
+    { tex: "F_N = mg - F\\sin\\theta", t: c("So the normal force is mg minus"), final: true, ulw: 470, ulColor: COL.N },
+    { tex: "F_N = mg + F\\sin\\theta", t: c("the normal force becomes mg plus"), final: true, ulw: 470, ulColor: COL.N, y: -80 },
+    { tex: "F_f = \\mu F_N", t: c("Since friction is proportional"), y: 50 },
+  ], { gap: 110 });
+  const n1 = hand(g, "pull up  ⇒  F_N ↓  ⇒  friction ↓", { size: 52 }), n2 = hand(g, "push down  ⇒  F_N ↑  ⇒  friction ↑", { size: 52 });
+  const th = 30, s = Math.sin(th * D2R), co = Math.cos(th * D2R), Lw = 250, Fmg = 0.95;
+  return t => {
+    H(t); floor.draw(-880, 170, 220, 170, ap(t, S(id) + 0.2, 0.8)); blk.at(C[0], C[1], 0);
+    const m = mode(t), M = mag(t), Fpx = Lw * Fmg * M;                    // F drawn to the same scale as mg
+    const Nmag = 1 + (m > 0.5 ? 1 : -1) * Fmg * M * s;
+    const k = ap(t, S(id) + 0.3, 0.6);
+    W.draw(C[0], C[1], C[0], C[1] + Lw, { p: k }); mgL.at(C[0] - 60, C[1] + Lw - 10, k);
+    N.draw(C[0], C[1], C[0], C[1] - Lw * Nmag, { p: k }); NL.at(C[0] - 70, C[1] - Lw * Nmag + 10, k);
+    // pull (from the right face, up and to the right) or push (into the left face, down and to the right)
+    const pullOp = 1 - smooth(0.35, 0.65, m), pushOp = smooth(0.35, 0.65, m);
+    const A = [C[0] + 130, C[1] - 40], Pt = [C[0] + 130 + Fpx * co, C[1] - 40 - Fpx * s];
+    const B = [C[0] - 130, C[1] - 40], Pb = [C[0] - 130 - Fpx * co, C[1] - 40 - Fpx * s];
+    const fk = ap(t, S(id) + 0.6, 0.7);
+    if (pullOp > 0.01) {
+      rope.draw(A[0], A[1], Pt[0] + 60 * co, Pt[1] - 60 * s, fk, pullOp);
+      Fp.draw(A[0], A[1], Pt[0], Pt[1], { p: fk, op: pullOp }); FL.at(Pt[0] + 30, Pt[1] - 30, fk * pullOp);
+      const sp = ap(t, c("Split the pull"), 0.6) * pullOp;
+      Fx.draw(A[0], A[1], Pt[0], A[1], { p: sp, dash: "14 10", op: sp }); Fy.draw(Pt[0], A[1], Pt[0], Pt[1], { p: sp, dash: "14 10", op: sp });
+      FxL.at((A[0] + Pt[0]) / 2, A[1] + 45, sp); FyL.at(Pt[0] + 30, (A[1] + Pt[1]) / 2, sp, { anchor: "l" });
+      an.draw(A[0], A[1], 90, -th, 0, fk * pullOp); thL.at(A[0] + 125 * Math.cos(15 * D2R), A[1] - 125 * Math.sin(15 * D2R), fk * pullOp);
+    } else {
+      rope.draw(0, 0, 0, 0, 0, 0);
+      Fp.draw(Pb[0], Pb[1], B[0], B[1], { op: pushOp }); FL.at(Pb[0] - 30, Pb[1] - 30, pushOp);
+      Fx.draw(Pb[0], Pb[1], B[0], Pb[1], { dash: "14 10", op: pushOp }); Fy.draw(B[0], Pb[1], B[0], B[1], { dash: "14 10", op: pushOp });
+      FxL.at((Pb[0] + B[0]) / 2, Pb[1] - 45, pushOp); FyL.at(B[0] - 30, (Pb[1] + B[1]) / 2 + 10, pushOp, { anchor: "r" });
+      an.draw(Pb[0], Pb[1], 90, 0, th, pushOp); thL.at(Pb[0] + 125 * Math.cos(15 * D2R), Pb[1] + 125 * Math.sin(15 * D2R), pushOp);
+    }
+    const fr = ap(t, c("Since friction is proportional"), 0.6);
+    Fr.draw(C[0] - 20, 170, C[0] - 20 - 0.45 * Lw * Nmag, 170, { p: fr }); FrL.at(C[0] - 120, 235, fr);
+    E1(t);
+    n1.write(230, 190, t, c("pulling up reduces"), { speed: 0.02 }); n2.write(230, 270, t, c("pushing down increases"), { speed: 0.02 });
+  };
+});
+
+/* ========================================================== s05 — lift */
+section("s05", (g, c, id) => {
+  const H = heading(g, "④", "normal force in a lift", S(id));
+  const shaftL = pen(g, MUTED, 4), shaftR = pen(g, MUTED, 4);
+  const cab = el("rect", { width: 440, height: 560, rx: 10, fill: "none", stroke: INK, "stroke-width": 6 }, g);
+  const scale = el("rect", { width: 180, height: 40, rx: 6, fill: "#e9e1d0", stroke: INK, "stroke-width": 4 }, g);
+  const you = block(g, 120, 210, { fill: "#fbf7ef" }), youL = hand(g, "you", { size: 44, anchor: "middle", color: MUTED });
+  const W = arrow(g, COL.W, 8), N = arrow(g, COL.N, 8), Aa = arrow(g, COL.A, 5);
+  const mgL = tex(g, "mg", { size: 48, color: COL.W }), NL = tex(g, "F_N", { size: 48, color: COL.N }), aL = tex(g, "a", { size: 48, color: COL.A });
+  const notF = hand(g, "(not a force)", { size: 40, color: COL.A });
+  const readout = hand(g, "", { size: 46, anchor: "middle", weight: 700 });
+  const up0 = c("Accelerating upward"), dn0 = c("Accelerating downward");
+  const acc = track([[0, 0], [up0, 0], [up0 + 0.8, 2], [dn0, 2], [dn0 + 0.8, -2], [E(id) - 0.6, -2], [E(id), 0]]);
+  const yc = track([[0, 0], [up0, 0], [dn0, -150], [E(id), 80]]);
+  const E1 = eqs(g, 380, -300, [
+    { tex: "F_N - mg = ma", t: c("Newton's second law") },
+    { tex: "F_N = m(g + a)", t: c("so the normal force is m times g plus a"), final: true, ulw: 360, ulColor: COL.N },
+    { tex: "F_N = m(g - a)", t: dn0 + 0.3, final: true, ulw: 360, ulColor: COL.N, y: -60 },
+  ], { gap: 115 });
+  const n1 = hand(g, "weight mg: never changes", { size: 54, color: COL.W }), n2 = hand(g, "the scales read F_N", { size: 54, color: COL.N });
+  return t => {
+    H(t);
+    shaftL.draw(-620, -540, -620, 540, ap(t, S(id), 0.6)); shaftR.draw(-140, -540, -140, 540, ap(t, S(id), 0.6));
+    const y = yc(t), a = acc(t), m = 70, gg = 9.8;
+    set(cab, { x: -600, y: -280 + y }); set(scale, { x: -470, y: 240 + y });
+    const P = [-380, 125 + y];
+    you.at(P[0], P[1], 0); youL.write(P[0] + 95, P[1] - 60, t, S(id), { speed: 0.001 });
+    const k = ap(t, c("what you feel"), 0.6), Ln = 230 * (1 + a / gg);
+    W.draw(P[0] - 20, P[1], P[0] - 20, P[1] + 230, { p: k }); mgL.at(P[0] - 85, P[1] + 220, k);
+    N.draw(P[0] + 20, P[1], P[0] + 20, P[1] - Ln, { p: k }); NL.at(P[0] + 90, P[1] - Ln + 10, k);
+    const ak = clamp(Math.abs(a) / 2) * ap(t, up0, 0.5);
+    Aa.draw(-60, 0 + y, -60, -Math.sign(a || 1) * 170 + y, { p: ak, dash: "12 10" }); aL.at(-20, -Math.sign(a || 1) * 90 + y, ak, { anchor: "l" });
+    notF.write(-30, -Math.sign(a || 1) * 90 + y + 50, t, up0 + 0.4, { op: ak, speed: 0.015 });
+    readout.write(-380, 270 + y, t, S(id) + 0.5, { speed: 0.001, txt: `${Math.round(m * (gg + a))} N`, op: ap(t, S(id) + 0.5) });
+    E1(t);
+    n1.write(380, 160, t, c("Your weight never changes"), { speed: 0.02 }); n2.write(380, 250, t, c("that's what the scales read"), { speed: 0.02 });
+  };
+});
+
+/* ========================================================== s06 — the inclined plane */
+const S06 = {};
+section("s06", (g, c, id) => {
+  const H = heading(g, "⑤", "the inclined plane", S(id));
+  const inc = incline(g, { L: 1150 });
+  const blk = block(g, 210, 130);
+  const W = arrow(g, COL.W, 8), N = arrow(g, COL.N, 8), Cperp = arrow(g, COL.W, 6), Cpar = arrow(g, COL.W, 6);
+  const axX = pen(g, INK, 3, { "stroke-dasharray": "12 10" }), axY = pen(g, INK, 3, { "stroke-dasharray": "12 10" });
+  const axXL = tex(g, "x_{\\parallel}", { size: 42 }), axYL = tex(g, "y_{\\perp}", { size: 42 });
+  const perpLine = pen(g, COL.N, 4, { "stroke-dasharray": "14 10" });
+  const thArc = arc(g, COL.W, 4), thArcL = tex(g, "\\theta", { size: 46, color: COL.W });
+  const fill1 = pen(g, MUTED, 2.5, { "stroke-dasharray": "6 8" }), fill2 = pen(g, MUTED, 2.5, { "stroke-dasharray": "6 8" });
+  const rm = rightMark(g, COL.W);
+  const hl = pen(g, COL.FR, 26);
+  const mgL = tex(g, "mg", { size: 50, color: COL.W }), NL = tex(g, "F_N", { size: 50, color: COL.N });
+  const cL = tex(g, "mg\\cos\\theta", { size: 46, color: COL.W }), sL = tex(g, "mg\\sin\\theta", { size: 46, color: COL.W });
+  const note1 = hand(g, "perpendicular lies along mg", { size: 48, color: COL.N }), note2 = hand(g, "tilt the slope by θ → its perpendicular tilts by θ", { size: 48, color: COL.N });
+  // the triangle that lifts off the page and turns upright
+  const tg = el("g", {}, g);
+  const triH = arrow(tg, COL.W, 6), triA = pen(tg, COL.W, 5), triO = pen(tg, COL.W, 5), triRm = rightMark(tg, COL.W), triArc = arc(tg, INK);
+  const triHL = tex(tg, "mg", { size: 44, color: COL.W }), triAL = tex(tg, "mg\\cos\\theta", { size: 42, color: COL.W }), triOL = tex(tg, "mg\\sin\\theta", { size: 42, color: COL.W }), triTh = tex(tg, "\\theta", { size: 42 });
+  const E1 = eqs(g, 230, 120, [
+    { tex: "F_{\\parallel} = mg\\sin\\theta", t: c("pulling down the slope, is mg sin θ") + 0.6 },
+    { tex: "F_N = mg\\cos\\theta", t: c("the normal force equals mg cos θ"), final: true, ulw: 390, ulColor: COL.N },
+  ], { gap: 110 });
+  const r0 = hand(g, "", { size: 50, weight: 700 });
+  const thT = track([[0, 30], [c("Start with the slope flat"), 30], [c("Start with the slope flat") + 1.8, 0], [c("Now tilt the slope by θ"), 0], [c("Now tilt the slope by θ") + 2.4, 30],
+    [c("At zero degrees") - 0.3, 30], [c("At zero degrees") + 1.3, 0], [c("At ninety degrees") - 0.3, 0], [c("At ninety degrees") + 2.0, 86], [E(id) - 1.6, 86], [E(id) - 0.1, 30]]);
+  S06.th = thT;
+  return t => {
+    H(t);
+    const th = thT(t), P0 = [-760, 330];
+    const { u, n } = inc(P0, th, ap(t, S(id) + 0.2, 0.8));
+    const C = add(add(P0, u, 600), n, 65);
+    S06.C = [C[0] + center("s06")[0], C[1] + center("s06")[1]];
+    blk.at(C[0], C[1], -th, ap(t, S(id) + 0.5, 0.5));
+    const Lw = 330, cth = Math.cos(th * D2R), sth = Math.sin(th * D2R);
+    const nIn = [-n[0], -n[1]], uDn = [-u[0], -u[1]];
+    const w = ap(t, c("weight still points straight down"), 0.6);
+    W.draw(C[0], C[1], C[0], C[1] + Lw, { p: w }); mgL.at(C[0] - 55, C[1] + Lw - 5, w);
+    const nk = ap(t, c("can only push perpendicular"), 0.6);
+    N.draw(C[0], C[1], ...add(C, n, Lw * cth), { p: nk, op: nk * (cth > 0.05 ? 1 : 0) }); NL.at(...add(add(C, n, Lw * cth + 40), [-40, 0]), nk * (cth > 0.1 ? 1 : 0));
+    const ax = ap(t, c("one axis along it"), 0.6) * (1 - ap(t, c("Read the triangle"), 0.6) * 0.6);
+    axX.draw(...add(C, u, -460), ...add(C, u, 420), ax, ax); axY.draw(...add(C, n, -380), ...add(C, n, 420), ax, ax);
+    axXL.at(...add(C, u, 470), ax); axYL.at(...add(add(C, n, 455), [40, 0]), ax);
+    // proof: the perpendicular (into the slope) rotates with the slope
+    const pf = win(t, c("Start with the slope flat"), c("Read the triangle") + 0.5, 0.5, 0.6);
+    perpLine.draw(C[0], C[1], ...add(C, nIn, Lw + 60), pf, pf);
+    note1.write(C[0] + 60, C[1] + 210, t, c("its perpendicular points straight down"), { op: win(t, c("its perpendicular points"), c("Now tilt the slope by θ") + 0.6), speed: 0.02 });
+    note2.write(180, -400, t, c("Its perpendicular tilts by exactly"), { op: 1 - ap(t, c("Read the triangle"), 0.5), speed: 0.018 });
+    const ang = ap(t, c("Now tilt the slope by θ"), 0.5);
+    const aMg = 90, aIn = Math.atan2(nIn[1], nIn[0]) / D2R;     // screen angles of mg (down) and the inward perpendicular
+    thArc.draw(C[0], C[1], 120, Math.min(aMg, aIn), Math.max(aMg, aIn), ang * (th > 3 ? 1 : 0));
+    const mid = (aMg + aIn) / 2; thArcL.at(C[0] + 160 * Math.cos(mid * D2R), C[1] + 160 * Math.sin(mid * D2R), ang * (th > 5 ? 1 : 0));
+    // components
+    const tr = ap(t, c("Read the triangle"), 0.6);
+    const pIn = add(C, nIn, Lw * cth), pDn = add(C, uDn, Lw * sth);
+    Cperp.draw(C[0], C[1], pIn[0], pIn[1], { p: tr, dash: "14 10", op: cth > 0.02 ? 1 : 0 });
+    Cpar.draw(C[0], C[1], pDn[0], pDn[1], { p: tr, dash: "14 10", op: sth > 0.02 ? 1 : 0 });
+    fill1.draw(pIn[0], pIn[1], C[0], C[1] + Lw, tr, tr * 0.8); fill2.draw(pDn[0], pDn[1], C[0], C[1] + Lw, tr, tr * 0.8);
+    rm.draw(C, nIn, uDn, 26, tr * (th > 3 && th < 87 ? 1 : 0));
+    cL.at(...add(add(C, nIn, Lw * cth * 0.6), [120, 0]), ap(t, c("pressing into the slope, is mg cos θ"), 0.5) * (cth > 0.08 ? 1 : 0.3), { anchor: "l" });
+    sL.at(...add(add(C, uDn, Lw * sth * 0.65), [0, -55]), ap(t, c("pulling down the slope, is mg sin θ"), 0.5) * (sth > 0.08 ? 1 : 0.3), { anchor: "r" });
+    S06.sPos = add(add(C, uDn, Lw * sth * 0.5), [0, 0]);
+    const fin = ap(t, cue("s13", "It's just one side"), 0.6);
+    hl.draw(C[0], C[1], pDn[0], pDn[1], fin, fin * (0.35 + 0.2 * Math.sin(t * 5)));
+    // lift-off: copy the triangle to the right and turn it upright
+    const lift = smooth(c("Read the triangle") + 0.3, c("Read the triangle") + 2.2, t), show = tr * (1 - ap(t, c("Check the extremes"), 0.5));
+    const rot0 = Math.atan2(nIn[1], nIn[0]) / D2R, rot = lerp(rot0, 0, ease(lift));
+    const pos = [lerp(C[0], 300, ease(lift)), lerp(C[1], -260, ease(lift))], sc = lerp(1, 1.25, ease(lift));
+    tg.setAttribute("transform", `translate(${pos[0]},${pos[1]}) rotate(${rot}) scale(${sc})`); tg.setAttribute("opacity", show * smooth(0, 0.15, lift));
+    const ad = Lw * Math.cos(30 * D2R), op_ = Lw * Math.sin(30 * D2R);
+    triH.draw(0, 0, ad, op_); triA.draw(0, 0, ad, 0); triO.draw(ad, 0, ad, op_); triRm.draw([ad, 0], [-1, 0], [0, 1], 24); triArc.draw(0, 0, 80, 0, 30);
+    triHL.at(ad / 2 - 40, op_ / 2 + 45, 1, { rot: -rot }); triAL.at(ad / 2, -40, 1, { rot: -rot }); triOL.at(ad + 20, op_ / 2, 1, { anchor: "l", rot: -rot }); triTh.at(110, 26, 1, { rot: -rot });
+    E1(t);
+    const z0 = c("At zero degrees"), n90 = c("At ninety degrees");
+    if (t > z0 - 0.2) r0.write(230, 400, t, z0, { speed: 0.001, op: ap(t, z0) * (1 - ap(t, E(id) - 1.6, 0.6)),
+      txt: `θ = ${Math.round(th)}°:  sin θ = ${fmt(sth)},  cos θ = ${fmt(cth)}` }); else r0.write(0, 0, t, 1e9);
+  };
+});
+
+/* ========================================================== s07 — friction on a slope */
+section("s07", (g, c, id) => {
+  const H = heading(g, "⑥", "friction on a slope: μs = tan θ", S(id));
+  const inc = incline(g, { L: 1050 });
+  const blk = block(g, 190, 120);
+  const W = arrow(g, COL.W, 7), N = arrow(g, COL.N, 7), Cpar = arrow(g, COL.W, 5), Fr = arrow(g, COL.FR, 8);
+  const tick = pen(g, COL.FR, 5), tickL = tex(g, "\\mu_s F_N\\;(\\max)", { size: 38, color: COL.FR });
+  const FrL = tex(g, "F_f", { size: 46, color: COL.FR }), sL = tex(g, "mg\\sin\\theta", { size: 40, color: COL.W });
+  const mus = 0.5, mud = 0.35, thc = Math.atan(mus) / D2R;
+  const thT = track([[0, 18], [c("Raise the angle"), 18], [c("They meet at the tipping point") + 0.3, thc], [E(id), thc]]);
+  const slide = track([[0, 0], [c("Once it slides"), 0], [E(id), 330]]);
+  // graph: forces vs angle
+  const G0 = [180, 380], GW = 640, GH = 340, th2x = a => G0[0] + a / 60 * GW, f2y = f => G0[1] - f * GH;
+  const gx = arrow(g, INK, 4), gy = arrow(g, INK, 4), gxl = tex(g, "\\theta", { size: 40 }), gyl = hand(g, "force (× mg)", { size: 40, color: MUTED });
+  const cS = el("path", { stroke: COL.W, "stroke-width": 5, fill: "none" }, g), cM = el("path", { stroke: COL.FR, "stroke-width": 5, fill: "none", "stroke-dasharray": "14 10" }, g);
+  const cSL = tex(g, "mg\\sin\\theta", { size: 36, color: COL.W }), cML = tex(g, "\\mu_s\\,mg\\cos\\theta", { size: 36, color: COL.FR });
+  const dot = el("circle", { r: 11, fill: COL.W }, g), cross = pen(g, INK, 3, { "stroke-dasharray": "8 8" }), crossL = tex(g, "\\tan\\theta_c = \\mu_s", { size: 40 });
+  const mk = (fn) => { let d = ""; for (let a = 0; a <= 60.01; a += 1) d += `${a ? "L" : "M"}${th2x(a)},${f2y(fn(a * D2R))}`; return d; };
+  set(cS, { d: mk(Math.sin) }); set(cM, { d: mk(a => mus * Math.cos(a)) });
+  const len = (p) => p.getTotalLength();
+  const E1 = eqs(g, 180, -390, [
+    { tex: "F_f \\le \\mu_s F_N", t: c("up to a limit"), y: -410 },
+    { tex: "F_f = mg\\sin\\theta \\;\\;(\\text{static})", t: c("exactly matches the down-slope pull"), y: -320 },
+    { tex: "mg\\sin\\theta = \\mu_s\\,mg\\cos\\theta", t: c("Set them equal"), y: -225, until: c("The mass cancels") + 0.2 },
+    { tex: "\\cancel{mg}\\sin\\theta = \\mu_s\\,\\cancel{mg}\\cos\\theta", t: c("The mass cancels") + 0.2, y: -225 },
+    { tex: "\\mu_s = \\dfrac{\\sin\\theta}{\\cos\\theta} = \\tan\\theta", t: c("divide by cos θ"), y: -110, final: true, ulw: 470, ulColor: COL.FR },
+  ]);
+  const E2 = eqs(g, -880, -330, [{ tex: "F_{\\text{net}} = mg\\sin\\theta - \\mu_d\\,mg\\cos\\theta", t: c("so the resultant force down the slope"), final: true, ulw: 620, ulColor: COL.W }]);
+  const meas = hand(g, "slip angle → measures μs", { size: 48, color: INK });
+  return t => {
+    H(t);
+    const th = thT(t), P0 = [-860, 380];
+    const { u, n } = inc(P0, th, ap(t, S(id) + 0.2, 0.8));
+    const d = 560 - slide(t);
+    const B = add(P0, u, d), C = add(B, n, 60);
+    blk.at(C[0], C[1], -th);
+    const Lw = 280, cth = Math.cos(th * D2R), sth = Math.sin(th * D2R), k = ap(t, S(id) + 0.4, 0.6);
+    W.draw(C[0], C[1], C[0], C[1] + Lw, { p: k }); N.draw(C[0], C[1], ...add(C, n, Lw * cth), { p: k });
+    Cpar.draw(C[0], C[1], ...add(C, u, -Lw * sth), { p: ap(t, c("exactly matches"), 0.5), dash: "12 9" });
+    sL.at(...add(add(C, u, -Lw * sth * 0.7), [0, 50]), ap(t, c("exactly matches"), 0.5));
+    const sliding = t > c("Once it slides");
+    const fLen = sliding ? Lw * mud * cth : Lw * Math.min(sth, mus * cth);
+    const fk = ap(t, c("Add friction"), 0.6), fs = add(B, u, 30);
+    Fr.draw(fs[0], fs[1], ...add(fs, u, fLen), { p: fk }); FrL.at(...add(add(fs, u, fLen * 0.5), n, -45), fk);
+    const tk = ap(t, c("up to a limit"), 0.5) * (sliding ? 0.3 : 1), tp = add(fs, u, Lw * mus * cth);
+    tick.draw(...add(tp, n, -28), ...add(tp, n, 28), tk, tk); tickL.at(...add(add(tp, n, -80), u, 40), tk, { anchor: "l" });
+    // graph
+    const gk = ap(t, c("Raise the angle"), 0.8);
+    gx.draw(G0[0], G0[1], G0[0] + GW + 40, G0[1], { p: gk }); gy.draw(G0[0], G0[1], G0[0], G0[1] - GH - 40, { p: gk });
+    gxl.at(G0[0] + GW + 60, G0[1] + 10, gk); gyl.write(G0[0] - 10, G0[1] - GH - 60, t, c("Raise the angle"), { op: gk, speed: 0.01 });
+    const L1 = len(cS), L2 = len(cM);
+    set(cS, { "stroke-dasharray": `${L1} ${L1}`, "stroke-dashoffset": L1 * (1 - ap(t, c("mg sin θ grows"), 1.2)), opacity: gk });
+    set(cM, { opacity: gk * ap(t, c("maximum friction"), 0.8) });
+    cSL.at(th2x(55), f2y(Math.sin(55 * D2R)) - 40, gk); cML.at(th2x(52), f2y(mus * Math.cos(52 * D2R)) + 45, gk * ap(t, c("maximum friction"), 0.8));
+    set(dot, { cx: th2x(Math.min(th, 60)), cy: f2y(Math.sin(th * D2R)), opacity: gk * (sliding ? 0 : 1) });
+    const ck = ap(t, c("They meet at the tipping point"), 0.6);
+    cross.draw(th2x(thc), G0[1], th2x(thc), f2y(Math.sin(thc * D2R)), ck, ck); crossL.at(th2x(thc) + 20, G0[1] + 50, ck, { anchor: "l" });
+    E1(t); E2(t);
+    meas.write(180, 520, t, c("Measure the angle"), { speed: 0.02 });
+  };
+});
+
+/* ========================================================== s08 — horizontal push on a slope */
+section("s08", (g, c, id) => {
+  const H = heading(g, "⑦", "a horizontal push on a slope", S(id));
+  const inc = incline(g, { L: 1100 });
+  const blk = block(g, 200, 125);
+  const W = arrow(g, COL.W, 7), N = arrow(g, COL.N, 8), F = arrow(g, COL.F, 8), Fa = arrow(g, COL.F, 5), Fp = arrow(g, COL.F, 5), Wa = arrow(g, COL.W, 4), Wp = arrow(g, COL.W, 4);
+  const FL = tex(g, "F", { size: 50, color: COL.F }), FaL = tex(g, "F\\cos\\theta", { size: 42, color: COL.F }), FpL = tex(g, "F\\sin\\theta", { size: 42, color: COL.F }), NL = tex(g, "F_N", { size: 48, color: COL.N });
+  const WaL = tex(g, "mg\\sin\\theta", { size: 36, color: COL.W }), WpL = tex(g, "mg\\cos\\theta", { size: 36, color: COL.W });
+  const an = arc(g, COL.F, 4), anL = tex(g, "\\theta", { size: 42, color: COL.F }), guide = pen(g, MUTED, 3, { "stroke-dasharray": "10 8" });
+  const smooth_ = hand(g, "smooth slope (no friction)", { size: 44, color: MUTED });
+  const E1 = eqs(g, 200, -330, [
+    { tex: "F\\cos\\theta = mg\\sin\\theta", t: c("F cos θ balances mg sin θ") },
+    { tex: "F = mg\\tan\\theta", t: c("so F equals mg tan θ"), final: true, ulw: 360, ulColor: COL.F },
+    { tex: "F_N = mg\\cos\\theta + F\\sin\\theta", t: c("the normal force must balance both"), y: -80 },
+    { tex: "\\phantom{F_N} = mg\\cos\\theta + mg\\tan\\theta\\sin\\theta = \\dfrac{mg}{\\cos\\theta}", t: c("The push adds"), y: 30, size: 40 },
+    { tex: "F_N > mg", t: c("bigger than the weight"), y: 140, final: true, ulw: 240, ulColor: COL.N },
+  ], { gap: 110 });
+  return t => {
+    H(t);
+    const th = 30, P0 = [-760, 360], { u, n } = inc(P0, th, ap(t, S(id) + 0.2, 0.8));
+    const C = add(add(P0, u, 520), n, 63); blk.at(C[0], C[1], -th);
+    smooth_.write(-880, 470, t, S(id) + 1, { speed: 0.02 });
+    const Lw = 260, cth = Math.cos(th * D2R), sth = Math.sin(th * D2R), Fm = Lw * Math.tan(th * D2R);
+    const k = ap(t, S(id) + 0.5, 0.6), fk = ap(t, c("horizontal push F"), 0.6);
+    W.draw(C[0], C[1], C[0], C[1] + Lw, { p: k });
+    const tail = [C[0] - 110 - Fm * 1.4, C[1]];
+    F.draw(tail[0], tail[1], C[0] - 110, C[1], { p: fk }); FL.at(tail[0] - 30, tail[1] - 30, fk);
+    const sp = ap(t, c("gets split too"), 0.6), nIn = [-n[0], -n[1]];
+    Fa.draw(C[0], C[1], ...add(C, u, Fm * cth * 1.4), { p: sp, dash: "12 9" }); FaL.at(...add(add(C, u, Fm * cth * 1.4 + 20), [0, -45]), sp);
+    Fp.draw(C[0], C[1], ...add(C, nIn, Fm * sth * 1.4), { p: sp, dash: "12 9" }); FpL.at(...add(add(C, nIn, Fm * sth * 1.4), [70, 20]), sp, { anchor: "l" });
+    const ak = ap(t, c("The angle between F and the slope"), 0.5);
+    guide.draw(tail[0], tail[1], ...add(tail, u, 360), ak, ak);
+    an.draw(tail[0], tail[1], 150, -th, 0, ak); anL.at(tail[0] + 190 * Math.cos(15 * D2R), tail[1] - 190 * Math.sin(15 * D2R), ak);
+    const wc = ap(t, c("Along the slope"), 0.5) * 0.85;
+    Wa.draw(C[0], C[1], ...add(C, u, -Lw * sth), { p: wc, dash: "10 8", op: wc }); WaL.at(...add(add(C, u, -Lw * sth), [-30, 50]), wc);
+    Wp.draw(C[0], C[1], ...add(C, nIn, Lw * cth), { p: wc, dash: "10 8", op: wc }); WpL.at(...add(add(C, nIn, Lw * cth), [-120, 30]), wc);
+    const nk = ap(t, c("the normal force must balance both"), 0.6), Nl = Lw * (cth + Math.tan(th * D2R) * sth);
+    N.draw(C[0], C[1], ...add(C, n, Nl), { p: nk }); NL.at(...add(add(C, n, Nl + 30), [-40, 0]), nk);
+    E1(t);
+  };
+});
+
+/* ========================================================== s09 — tension at angles */
+section("s09", (g, c, id) => {
+  const H = heading(g, "⑧", "tension in strings", S(id));
+  // single string
+  const ceil1 = pen(g, INK, 6), str1 = pen(g, MUTED, 4), b1 = block(g, 120, 130);
+  const T1 = arrow(g, COL.T, 7), W1 = arrow(g, COL.W, 7), T1L = tex(g, "T", { size: 46, color: COL.T }), W1L = tex(g, "mg", { size: 46, color: COL.W });
+  const eq1 = tex(g, "T = mg", { size: 50 });
+  // lamp on two strings
+  const ceil = pen(g, INK, 6), sA = pen(g, MUTED, 4), sB = pen(g, MUTED, 4);
+  const lamp = el("g", {}, g); el("path", { d: "M-55,0 Q0,-70 55,0 Z", fill: "#f5d58a", stroke: INK, "stroke-width": 4 }, lamp); el("circle", { cx: 0, cy: 8, r: 14, fill: "#ffe9a8", stroke: INK, "stroke-width": 3 }, lamp);
+  const TA = arrow(g, COL.T, 7), TB = arrow(g, COL.T, 7), WL = arrow(g, COL.W, 7);
+  const TAx = arrow(g, COL.T, 4), TAy = arrow(g, COL.T, 4), TBx = arrow(g, COL.T, 4), TBy = arrow(g, COL.T, 4);
+  const aA = arc(g), aB = arc(g), aAL = tex(g, "\\alpha", { size: 40 }), aBL = tex(g, "\\alpha", { size: 40 });
+  const TAL = tex(g, "T", { size: 46, color: COL.T }), TBL = tex(g, "T", { size: 46, color: COL.T }), WLL = tex(g, "mg", { size: 46, color: COL.W });
+  const cxL = tex(g, "T\\cos\\alpha", { size: 38, color: COL.T }), cyL = tex(g, "T\\sin\\alpha", { size: 38, color: COL.T });
+  const read = hand(g, "", { size: 52, color: COL.T, weight: 700 });
+  const asym = c("With unequal angles");
+  const a1 = track([[0, 40], [c("Flatten the strings"), 40], [c("Flatten the strings") + 4, 8], [asym - 1.2, 8], [asym + 0.6, 30]]);
+  const a2 = track([[0, 40], [c("Flatten the strings"), 40], [c("Flatten the strings") + 4, 8], [asym - 1.2, 8], [asym + 0.6, 60]]);
+  const E1 = eqs(g, -420, 150, [
+    { tex: "2T\\sin\\alpha = mg", t: c("two T sin α equals mg"), until: asym },
+    { tex: "T = \\dfrac{mg}{2\\sin\\alpha}", t: c("so T equals mg over"), final: true, ulw: 330, ulColor: COL.T, until: asym },
+    { tex: "\\alpha \\to 0 \\;\\Rightarrow\\; T \\to \\infty", t: c("the tension shoots up"), dx: 470, y: 150, until: asym },
+    { tex: "T_1\\cos\\alpha_1 = T_2\\cos\\alpha_2", t: c("sideways, T one"), y: 150 },
+    { tex: "T_1\\sin\\alpha_1 + T_2\\sin\\alpha_2 = mg", t: c("upward, T one"), y: 260 },
+  ], { gap: 120 });
+  const tri = hand(g, "nose to tail: a closed triangle", { size: 46, color: INK });
+  const cTA = arrow(g, COL.T, 6), cTB = arrow(g, COL.T, 6), cW = arrow(g, COL.W, 6);
+  return t => {
+    H(t);
+    const k1 = ap(t, c("Hang a mass from a single string"), 0.6), s0 = ap(t, S(id) + 0.3, 0.6);
+    ceil1.draw(-900, -380, -660, -380, s0); str1.draw(-780, -380, -780, -110, s0); b1.at(-780, -45, 0, s0);
+    T1.draw(-780, -110, -780, -320, { p: k1 }); T1L.at(-735, -300, k1); W1.draw(-780, -45, -780, 165, { p: k1 }); W1L.at(-725, 150, k1); eq1.at(-780, 250, ap(t, c("the tension equals mg"), 0.5));
+    // lamp
+    const lk = ap(t, c("Now hang a lamp"), 0.6), xL = -300, xR = 760, yA = -400;
+    const A1 = a1(t) * D2R, A2 = a2(t) * D2R;
+    const s = (xR - xL) / (Math.cos(A1) + Math.sin(A1) * Math.cos(A2) / Math.sin(A2));
+    const P = [xL + s * Math.cos(A1), yA + s * Math.sin(A1)];
+    ceil.draw(xL - 60, yA, xR + 60, yA, lk); sA.draw(xL, yA, P[0], P[1], lk); sB.draw(xR, yA, P[0], P[1], lk);
+    lamp.setAttribute("transform", `translate(${P[0]},${P[1] + 10})`); lamp.setAttribute("opacity", lk);
+    const mg = 1, Ta = mg * Math.cos(A2) / Math.sin(A1 + A2), Tb = mg * Math.cos(A1) / Math.sin(A1 + A2), Ls = 200;
+    const capL = v => Math.min(v * Ls, 560);
+    const dA = [-Math.cos(A1), -Math.sin(A1)], dB = [Math.cos(A2), -Math.sin(A2)];
+    const tA = add(P, dA, capL(Ta)), tB = add(P, dB, capL(Tb));
+    TA.draw(P[0], P[1], tA[0], tA[1], { p: lk }); TB.draw(P[0], P[1], tB[0], tB[1], { p: lk });
+    TAL.at(tA[0] - 45, tA[1] - 10, lk); TBL.at(tB[0] + 45, tB[1] - 10, lk);
+    WL.draw(P[0], P[1] + 30, P[0], P[1] + 30 + Ls, { p: lk }); WLL.at(P[0] + 55, P[1] + Ls + 20, lk);
+    aA.draw(xL, yA, 90, 0, A1 / D2R, lk); aAL.at(xL + 125 * Math.cos(A1 / 2), yA + 125 * Math.sin(A1 / 2), lk);
+    aB.draw(xR, yA, 90, 180 - A2 / D2R, 180, lk); aBL.at(xR - 125 * Math.cos(A2 / 2), yA + 125 * Math.sin(A2 / 2), lk);
+    const sp = ap(t, c("Split each tension"), 0.6) * (1 - ap(t, c("nose to tail"), 0.6) * 0.7);
+    TAx.draw(P[0], P[1], tA[0], P[1], { p: sp, dash: "12 9", op: sp }); TAy.draw(tA[0], P[1], tA[0], tA[1], { p: sp, dash: "12 9", op: sp });
+    TBx.draw(P[0], P[1], tB[0], P[1], { p: sp, dash: "12 9", op: sp }); TBy.draw(tB[0], P[1], tB[0], tB[1], { p: sp, dash: "12 9", op: sp });
+    const lab = sp * (1 - ap(t, asym, 0.5));
+    cxL.at((P[0] + tB[0]) / 2, P[1] + 40, lab); cyL.at(tB[0] + 20, (P[1] + tB[1]) / 2, lab, { anchor: "l" });
+    const rk = win(t, c("Flatten the strings"), asym, 0.5, 0.5);
+    read.write(-420, 30, t, c("Flatten the strings"), { op: rk, speed: 0.001, txt: `α = ${Math.round(a1(t))}°   →   T = ${fmt(Ta, 1)} mg` });
+    E1(t);
+    // triangle of forces: slide copies nose to tail
+    const nt = ap(t, c("nose to tail"), 0.4), mv = smooth(c("nose to tail") + 0.3, c("nose to tail") + 2.3, t);
+    const Q = [380, 120], q1 = [Q[0], Q[1] + Ls], q2 = add(q1, dB, Tb * Ls);
+    const lerpP = (a, b) => [lerp(a[0], b[0], ease(mv)), lerp(a[1], b[1], ease(mv))];
+    const w0 = lerpP([P[0], P[1] + 30], Q), b0 = lerpP(P, q1), a0 = lerpP(P, q2);
+    cW.draw(w0[0], w0[1], w0[0], w0[1] + Ls, { op: nt }); cTB.draw(b0[0], b0[1], ...add(b0, dB, Tb * Ls), { op: nt }); cTA.draw(a0[0], a0[1], ...add(a0, dA, Ta * Ls), { op: nt });
+    tri.write(380, 520, t, c("they close into a triangle"), { speed: 0.02 });
+  };
+});
+
+/* ========================================================== s10 — pulley */
+section("s10", (g, c, id) => {
+  const H = heading(g, "⑨", "tension over a pulley", S(id));
+  const top = pen(g, INK, 6), legs = [pen(g, INK, 5), pen(g, INK, 5)];
+  const wheel = el("circle", { r: 42, fill: "#fbf7ef", stroke: INK, "stroke-width": 5 }, g), hub = el("circle", { r: 7, fill: INK }, g);
+  const s1 = pen(g, MUTED, 4), s2 = pen(g, MUTED, 4);
+  const bM = block(g, 240, 160), bm = block(g, 140, 140), ML = tex(g, "M", { size: 50 }), mL = tex(g, "m", { size: 50 });
+  const T1 = arrow(g, COL.T, 8), T2 = arrow(g, COL.T, 8), W2 = arrow(g, COL.W, 8), A1 = arrow(g, COL.A, 5), A2 = arrow(g, COL.A, 5);
+  const T1L = tex(g, "T", { size: 48, color: COL.T }), T2L = tex(g, "T", { size: 48, color: COL.T }), W2L = tex(g, "mg", { size: 48, color: COL.W });
+  const a1L = tex(g, "a", { size: 44, color: COL.A }), a2L = tex(g, "a", { size: 44, color: COL.A });
+  const note = hand(g, "same T, new direction", { size: 50, color: COL.T });
+  const disp = track([[0, 0], [c("Tie a block"), 0], [E(id) + 0.5, 170]]);
+  const E1 = eqs(g, -880, 210, [
+    { tex: "mg - T = ma", t: c("For the hanging mass") },
+    { tex: "T = Ma", t: c("For the block, T equals") },
+    { tex: "\\Rightarrow\\ T = \\dfrac{M}{M+m}\\,mg\\; < \\; mg", t: c("the tension is always less"), final: true, ulw: 520, ulColor: COL.T, dx: 380, y: 260 },
+  ], { gap: 105 });
+  return t => {
+    H(t);
+    const k = ap(t, S(id) + 0.2, 0.8), d = disp(t), Pc = [300, -100];
+    top.draw(-900, -60, 300, -60, k); legs[0].draw(-860, -60, -860, 160, k); legs[1].draw(240, -60, 240, 160, k);
+    set(wheel, { cx: Pc[0], cy: Pc[1], opacity: k }); set(hub, { cx: Pc[0], cy: Pc[1], opacity: k });
+    const bx = -450 + d, hy = 40 + d;
+    bM.at(bx, -140, 0, k); ML.at(bx, -140, k); bm.at(Pc[0] + 42, hy, 0, k); mL.at(Pc[0] + 42, hy, k);
+    s1.draw(bx + 120, -142, Pc[0], -142, k); s2.draw(Pc[0] + 42, Pc[1], Pc[0] + 42, hy - 70, k);
+    const f = ap(t, c("The same tension"), 0.6);
+    T1.draw(bx + 120, -142, bx + 330, -142, { p: f }); T1L.at(bx + 300, -195, f);
+    T2.draw(Pc[0] + 42, hy - 70, Pc[0] + 42, hy - 260, { p: f }); T2L.at(Pc[0] + 100, hy - 230, f);
+    W2.draw(Pc[0] + 42, hy, Pc[0] + 42, hy + 290, { p: f }); W2L.at(Pc[0] + 110, hy + 270, f);
+    const a = ap(t, c("they share the same acceleration"), 0.6);
+    A1.draw(bx - 60, -260, bx + 80, -260, { p: a, dash: "10 8" }); a1L.at(bx + 110, -260, a);
+    A2.draw(Pc[0] + 200, hy - 40, Pc[0] + 200, hy + 100, { p: a, dash: "10 8" }); a2L.at(Pc[0] + 235, hy + 60, a);
+    note.write(Pc[0] - 120, Pc[1] - 110, t, c("only changes direction"), { speed: 0.02 });
+    E1(t);
+  };
+});
+
+/* ========================================================== s11 — buoyancy */
+section("s11", (g, c, id) => {
+  const H = heading(g, "⑩", "buoyancy: F_b = ρVg", S(id));
+  const tank = el("rect", { x: -860, y: -300, width: 820, height: 700, fill: "#d6e8f6", stroke: INK, "stroke-width": 6 }, g);
+  const surf = el("path", { stroke: "#2c6fb0", "stroke-width": 4, fill: "none" }, g);
+  const blk = block(g, 280, 220, { fill: "#fbf7ef" }), sub = el("rect", { fill: "url(#hatch)", opacity: 0 }, g);
+  const pd = Array.from({ length: 4 }, () => arrow(g, "#2c6fb0", 4)), pu = Array.from({ length: 4 }, () => arrow(g, "#2c6fb0", 4));
+  const pl = Array.from({ length: 3 }, () => arrow(g, "#2c6fb0", 4)), pr = Array.from({ length: 3 }, () => arrow(g, "#2c6fb0", 4));
+  const Fb = arrow(g, COL.B, 9), Wb = arrow(g, COL.W, 8), FbL = tex(g, "F_b", { size: 50, color: COL.B }), WbL = tex(g, "mg", { size: 48, color: COL.W });
+  const hBr = pen(g, INK, 3), hL = tex(g, "h", { size: 46 }), AL = tex(g, "A", { size: 44 });
+  const cancelN = hand(g, "sides cancel", { size: 44, color: "#2c6fb0" });
+  const E1 = eqs(g, 80, -330, [
+    { tex: "F_b = p_{\\text{bottom}}A - p_{\\text{top}}A", t: c("The extra pressure") },
+    { tex: "\\phantom{F_b} = (\\rho g h)\\,A", t: c("is ρ g h") },
+    { tex: "\\phantom{F_b} = \\rho\\,(hA)\\,g = \\rho V g", t: c("that's ρ V g"), final: true, ulw: 560, ulColor: COL.B },
+    { tex: "\\rho\\,V_{\\text{sub}}\\,g = mg", t: c("ρ times the submerged volume"), y: 300, final: true, ulw: 330, ulColor: COL.B },
+  ], { gap: 110 });
+  const n1 = hand(g, "ρ = density of the FLUID · V = volume pushed aside", { size: 44 }), n2 = hand(g, "= weight of the displaced fluid", { size: 48, color: COL.B });
+  const fl = c("A floating object");
+  const yb = track([[0, 130], [fl, 130], [fl + 2.5, -200]]);
+  return t => {
+    H(t);
+    const k = ap(t, S(id) + 0.2, 0.8); set(tank, { opacity: k });
+    let d = ""; for (let x = -860; x <= -40; x += 20) d += `${x === -860 ? "M" : "L"}${x},${-230 + 5 * Math.sin(x * 0.03 + t * 2)}`; set(surf, { d, opacity: k });
+    const y = yb(t), bx = -450, top = y - 110, bot = y + 110, f = ap(t, fl, 0.5);
+    blk.at(bx, y, 0, ap(t, c("put a block"), 0.5));
+    const pk = ap(t, c("Fluid pressure grows with depth"), 0.6) * (1 - f);
+    const pScale = d0 => 0.32 * (d0 + 230);
+    for (let i = 0; i < 4; i++) {
+      const x = bx - 105 + i * 70;
+      pd[i].draw(x, top - pScale(top), x, top - 4, { p: pk, op: pk }); pu[i].draw(x, bot + pScale(bot), x, bot + 4, { p: pk, op: pk });
+    }
+    const sideK = pk * (1 - 0.5 * ap(t, c("The pushes on the sides cancel") + 1.2, 0.6));
+    for (let i = 0; i < 3; i++) { const yy = top + 50 + i * 60, L = pScale(yy) * 0.8; pl[i].draw(bx - 140 - L, yy, bx - 144, yy, { p: sideK, op: sideK }); pr[i].draw(bx + 140 + L, yy, bx + 144, yy, { p: sideK, op: sideK }); }
+    cancelN.write(bx - 120, top - 140, t, c("The pushes on the sides cancel"), { op: pk, speed: 0.02 });
+    const fb = ap(t, c("The difference is buoyancy"), 0.6);
+    const fbl = 240 - 70 * f; Fb.draw(bx, y, bx, y - fbl, { p: fb }); FbL.at(bx + 60, y - fbl + 20, fb);
+    const hk = ap(t, c("height h"), 0.5) * (1 - f);
+    hBr.draw(bx + 170, top, bx + 170, bot, hk, hk); hL.at(bx + 210, y, hk); AL.at(bx, top + 30, hk);
+    Wb.draw(bx, y, bx, y + 170, { p: f }); WbL.at(bx + 55, y + 150, f);
+    const subH = Math.max(0, bot - (-230)); set(sub, { x: bx - 140, y: -230, width: 280, height: Math.min(220, subH), opacity: 0.55 * f });
+    E1(t);
+    n1.write(80, 60, t, c("Here ρ is the fluid's density"), { speed: 0.016 }); n2.write(80, 150, t, c("exactly the weight of the fluid"), { speed: 0.02 });
+  };
+});
+
+/* ========================================================== s12 — viscous drag */
+section("s12", (g, c, id) => {
+  const H = heading(g, "⑪", "viscous drag and terminal speed", S(id));
+  const tube = el("rect", { x: -720, y: -380, width: 360, height: 860, rx: 20, fill: "#f3e3b5", stroke: INK, "stroke-width": 6 }, g);
+  const ball = el("circle", { r: 40, fill: "#d9dbe0", stroke: INK, "stroke-width": 4 }, g), rad = pen(g, INK, 3), rL = tex(g, "r", { size: 40 });
+  const Wd = arrow(g, COL.W, 8), Bd = arrow(g, COL.B, 8), Dd = arrow(g, COL.D, 8), lvl = pen(g, MUTED, 3, { "stroke-dasharray": "8 8" });
+  const WdL = tex(g, "mg", { size: 46, color: COL.W }), BdL = tex(g, "F_b", { size: 46, color: COL.B }), DdL = tex(g, "F_d", { size: 46, color: COL.D });
+  const drop = c("Drop a ball bearing"), tau = 1.4;
+  const v = t => (t < drop ? 0 : 1 - Math.exp(-(t - drop) / tau));
+  const ypos = t => (t < drop ? -300 : -300 + 25 * ((t - drop) - tau * (1 - Math.exp(-(t - drop) / tau))));
+  const cond = hand(g, "small · slow · smooth (laminar) flow", { size: 46, color: COL.D });
+  const prop = hand(g, "", { size: 48, color: COL.D, weight: 700 });
+  const E1 = eqs(g, -200, -370, [
+    { tex: "F_d = 6\\pi\\eta r v", t: c("Stokes' law gives the drag"), final: true, ulw: 330, ulColor: COL.D },
+    { tex: "mg = F_b + 6\\pi\\eta r v_t", t: c("Write the balance"), y: -150 },
+    { tex: "\\rho_s\\tfrac{4}{3}\\pi r^3 g = \\rho_f\\tfrac{4}{3}\\pi r^3 g + 6\\pi\\eta r v_t", t: c("Replace each mass"), y: -40, size: 42 },
+    { tex: "6\\pi\\eta r v_t = \\tfrac{4}{3}\\pi r^3 g\\,(\\rho_s - \\rho_f)", t: c("and solve"), y: 70, size: 42 },
+    { tex: "v_t = \\dfrac{2r^2 g\\,(\\rho_s - \\rho_f)}{9\\eta}", t: c("The terminal speed is"), y: 210, final: true, ulw: 420, ulColor: COL.D },
+  ]);
+  return t => {
+    H(t);
+    set(tube, { opacity: ap(t, S(id) + 0.2, 0.6) });
+    const y = ypos(t), x = -540, vv = v(t), k = ap(t, S(id) + 0.6, 0.5);
+    set(ball, { cx: x, cy: y, opacity: k });
+    const rk = win(t, c("For a small sphere"), drop, 0.5, 0.4); rad.draw(x, y, x + 40, y, rk, rk); rL.at(x + 20, y - 30, rk);
+    cond.write(-200, -270, t, c("For a small sphere"), { speed: 0.015 });
+    const mgL = 230, fbL = 60, fdMax = mgL - fbL, pre = ap(t, c("Stokes' law gives the drag"), 0.5) * (t < drop ? 1 : 0);
+    const fd = t < drop ? 90 * pre : fdMax * vv;
+    const fk = ap(t, c("Weight pulls down"), 0.5);
+    Wd.draw(x - 14, y, x - 14, y + mgL, { p: fk }); WdL.at(x - 70, y + mgL - 10, fk);
+    Bd.draw(x - 14, y, x - 14, y - fbL, { p: fk }); BdL.at(x - 75, y - fbL + 10, fk);
+    Dd.draw(x + 14, y - (t < drop ? 0 : fbL) - 40, x + 14, y - (t < drop ? 0 : fbL) - 40 - fd, { op: Math.max(pre, fk) }); DdL.at(x + 75, y - fbL - 40 - fd + 20, Math.max(pre, fk));
+    const lk = fk * ap(t, c("until the forces balance"), 0.6);
+    lvl.draw(x - 120, y - mgL - 40, x + 120, y - mgL - 40, lk, lk);
+    prop.write(-200, 400, t, c("It grows with speed"), { op: ap(t, c("It grows with speed")), speed: 0.001, txt: t < c("That's terminal speed") ? "F_d ∝ v  —  faster → more drag" : "F_b + F_d = mg  →  terminal speed" });
+    E1(t);
+  };
+});
+
+/* ========================================================== s13 — the recipe (drawn huge across the whole sheet) */
+const REC = el("g", {}, world);
+const recipe = ["1  isolate the object: only forces ON it", "2  axes along / across the surface", "3  split: cos touching θ, sin across", "4  balance each direction"]
+  .map(txt => hand(REC, txt, { size: 330, weight: 700 }));
+const finale = hand(world, "just one side of a triangle", { size: 70, color: COL.FR, weight: 700 });
+function updateRecipe(t) {
+  const id = "s13", c = p => cue(id, p);
+  const [x0, y0] = [350, 150];
+  const T = [c("Isolate the object"), c("Choose axes"), c("Split each force"), c("Then balance")];
+  const out = ap(t, c("So mg sin θ isn't"), 0.6);
+  recipe.forEach((r, i) => r.write(x0, y0 + i * 600 + 400, t, T[i], { speed: 0.025, op: 1 - out }));
+  const dim = ap(t, S(id) + 1.5, 1) * (1 - out);
+  for (const s of SECS) s.g.setAttribute("opacity", 1 - 0.72 * dim);
+  finale.write(center("s06")[0] - 900, center("s06")[1] - 190, t, c("It's just one side"), { speed: 0.03 });
+}
+
+/* ========================================================== camera */
+const CAM = [];
+const key = (t, c, z = 1, r = 0) => CAM.push({ t, c, z, r });
+const ids = CFG.scenes.map(s => s.id).filter(i => i !== "s13");
+ids.forEach((id, i) => {
+  const [cx, cy] = center(id);
+  key(S(id) + (i === 0 ? 0 : 0.9), [cx, cy], 1);
+  key(E(id) - 0.5, [cx, cy], 1);
+});
+{ // s06: turn the paper so the slope lies flat while the axes go in, then turn back
+  const c = p => cue("s06", p), [cx, cy] = center("s06");
+  const Cc = [cx - 760 + 600 * Math.cos(30 * D2R) - 65 * Math.sin(30 * D2R), cy + 330 - 600 * Math.sin(30 * D2R) - 65 * Math.cos(30 * D2R)];
+  key(c("So tilt your point of view"), [cx, cy], 1, 0);
+  key(c("So tilt your point of view") + 2.2, [lerp(cx, Cc[0], 0.5), lerp(cy, Cc[1], 0.5)], 1.05, 30);
+  key(c("Here's the key geometry") - 0.2, [lerp(cx, Cc[0], 0.5), lerp(cy, Cc[1], 0.5)], 1.05, 30);
+  key(c("Here's the key geometry") + 1.6, [cx, cy], 1, 0);
+}
+{ // s13: pull back over the whole worksheet, then dive into mg sin θ
+  const c = p => cue("s13", p), all = [3 * PW / 2, PH];
+  key(S("s13") + 0.2, center("s12"), 1);
+  key(S("s13") + 2.6, all, 0.205);
+  key(c("So mg sin θ isn't") - 0.1, all, 0.205);
+  key(c("It's just one side"), [center("s06")[0] - 300, center("s06")[1] + 120], 1.25);
+  key(TOTAL, [center("s06")[0] - 260, center("s06")[1] + 140], 1.32);
+}
+CAM.sort((a, b) => a.t - b.t);
+const cam = document.getElementById("cam");
+function cameraAt(t) {
+  let i = 0; while (i < CAM.length - 2 && CAM[i + 1].t <= t) i++;
+  const a = CAM[i], b = CAM[i + 1], k = ease(clamp((t - a.t) / Math.max(1e-3, b.t - a.t)));
+  // zoom interpolates in log space so a big pull-back feels even
+  const z = Math.exp(lerp(Math.log(a.z), Math.log(b.z), k)), r = lerp(a.r, b.r, k);
+  const cx = lerp(a.c[0], b.c[0], k), cy = lerp(a.c[1], b.c[1], k);
+  cam.setAttribute("transform", `translate(960 540) scale(${z}) rotate(${r}) translate(${-cx} ${-cy})`);
+}
+
+/* ========================================================== render */
+function renderAt(t) {
+  t = clamp(t, 0, TOTAL - 1e-4);
+  cameraAt(t);
+  for (const s of SECS) s.update(t);
+  updateRecipe(t);
+  const f = Math.max(1 - smooth(0.05, 0.6, t), smooth(TOTAL - 0.8, TOTAL - 0.05, t));
+  document.getElementById("fade").style.opacity = f.toFixed(3);
+  return t;
+}
+
+await document.fonts.ready;
+await Promise.all([document.fonts.load("600 50px Hand", "abc"), document.fonts.load("700 50px Hand", "abc"),
+  document.fonts.load("italic 40px KaTeX_Math", "mg"), document.fonts.load("40px KaTeX_Main", "=+"), document.fonts.load("40px KaTeX_Size1", "(")]);
+window.TOTAL_SECONDS = TOTAL;
+window.renderAt = renderAt;
+renderAt(params.has("t") ? parseFloat(params.get("t")) : 0);
+window.__ready = true;
+
+if (PREVIEW) {
+  const stage = document.getElementById("stage"), controls = document.getElementById("controls");
+  controls.style.display = "flex";
+  const fit = () => { const s = Math.min(innerWidth / 1920, (innerHeight - 50) / 1080); stage.style.transform = `scale(${s})`; };
+  addEventListener("resize", fit); fit();
+  const scrub = document.getElementById("scrub"), clock = document.getElementById("clock"), btn = document.getElementById("play");
+  scrub.max = TOTAL;
+  const audios = CFG.scenes.map(s => { const a = new Audio(`/audio/${s.id}.wav`); a.preload = "auto"; return a; });
+  let playing = false, t0 = 0, wall0 = 0, cur = 0, curScene = -1;
+  const sceneIndex = t => CFG.scenes.findIndex(s => t >= S(s.id) && t < E(s.id));
+  const syncAudio = t => { const i = sceneIndex(t); if (i !== curScene) { audios.forEach(a => a.pause()); curScene = i; if (playing && i >= 0) { audios[i].currentTime = t - S(CFG.scenes[i].id); audios[i].play().catch(() => {}); } } };
+  const show = t => { cur = t; renderAt(t); scrub.value = t; clock.textContent = `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`; };
+  scrub.addEventListener("input", () => { playing = false; btn.textContent = "Play"; audios.forEach(a => a.pause()); curScene = -1; show(parseFloat(scrub.value)); });
+  btn.addEventListener("click", () => { playing = !playing; btn.textContent = playing ? "Pause" : "Play"; t0 = cur; wall0 = performance.now(); curScene = -1; if (!playing) audios.forEach(a => a.pause()); });
+  const loop = () => { if (playing) { const t = t0 + (performance.now() - wall0) / 1000; if (t >= TOTAL) { playing = false; btn.textContent = "Play"; } show(Math.min(t, TOTAL)); syncAudio(t); } requestAnimationFrame(loop); };
+  show(params.has("t") ? parseFloat(params.get("t")) : 0); loop();
+}
+</script>
+</body>
+</html>
