@@ -68,6 +68,25 @@ The proof follows the visual:
    mg and the slope is 90° − θ. The perpendicular is 90° from the slope, so the angle between mg and the
    perpendicular is 90° − (90° − θ) = θ.
 
+## 5. Worked examples added to the video (x1–x8)
+
+Typical IB-style numerical problems for each contact force, with g = 9.81 m s⁻². Numbers were chosen so every step is a
+clean calculation, and each result was checked (including the force balance at the end).
+
+| # | After | Problem | Key steps | Result |
+|---|---|---|---|---|
+| x1 | normal force at an angle | 10 kg crate, rope 30 N at 30° above horizontal, μ = 0.2 | F_N = mg − F sin θ = 98.1 − 15; f = μF_N; F cos θ − f = ma | F_N = 83.1 N, f = 16.6 N, a = 0.94 m s⁻² |
+| x2 | lift | 70 kg person on scales, a = 1.2 m s⁻² | F_N = mg, m(g + a), m(g − a) | 687 N, 771 N, 603 N |
+| x3 | friction on a slope | slips at 28°; then 5 kg on 35°, μd = 0.3 | μs = tan 28°; mg sin θ − μd mg cos θ = ma | μs = 0.53; 28.1 − 12.0 = 16.1 N; a = 3.2 m s⁻² |
+| x4 | horizontal push on a slope | 10 kg held on a smooth 25° ramp | F = mg tan θ; F_N = mg cos θ + F sin θ | F = 45.7 N; F_N = 108 N (> mg) |
+| x5 | two cables | 10 kg sign, cables at 30° and 60° | T₂ = T₁ cos 30° / cos 60° = 1.73 T₁; 2T₁ = mg | T₁ = 49 N, T₂ = 85 N |
+| x6 | pulley | M = 3 kg on a smooth table, m = 2 kg hanging | a = mg/(M + m); T = Ma; check mg − T = ma | a = 3.92 m s⁻², T = 11.8 N |
+| x7 | buoyancy | 0.80 kg block, V = 1.0 × 10⁻³ m³, in water | F_b = ρVg = 9.81 N > mg = 7.85 N; V_sub = m/ρ | floats, 80 % submerged |
+| x8 | terminal speed | steel ball r = 2.0 mm, ρs = 7800, oil ρf = 900 kg m⁻³, η = 0.90 Pa s | v_t = 2r²g(ρs − ρf)/9η | 0.067 m s⁻¹ (about 7 cm s⁻¹) |
+
+These follow the standard problem types in IB question banks and revision notes (rope on a rough floor, lift scales, rough
+slope, two-cable loads, pulley systems, floating blocks, Stokes terminal speed).
+
 ## Sources
 
 * TutorChase, IB Physics 2025, *1.2.2 Contact Forces*: https://www.tutorchase.com/notes/ib/physics-2025/1-2-2-contact-forces

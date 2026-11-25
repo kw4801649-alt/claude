@@ -42,7 +42,13 @@
   },
   "pronunciations": {
     "Newton's": "Newton's",
-    "kg": "kilograms"
+    "kg": "kilograms",
+    "metres": "meters",
+    "metre": "meter",
+    "millimetres": "millimeters",
+    "centimetres": "centimeters",
+    "litre": "liter",
+    "litres": "liters"
   },
   "scenes": [
     {

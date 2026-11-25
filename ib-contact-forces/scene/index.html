@@ -192,7 +192,8 @@ const add = (p, v, s = 1) => [p[0] + v[0] * s, p[1] + v[1] * s];
 
 /* ========================================================== the sheet layout */
 const PW = 2300, PH = 1500;
-const POS = { s01: [0, 0], s02: [1, 0], s03: [2, 0], s04: [3, 0], s05: [3, 1], s06: [2, 1], s07: [1, 1], s08: [0, 1], s09: [0, 2], s10: [1, 2], s11: [2, 2], s12: [3, 2] };
+const ORDER = ["s01", "s02", "s03", "s04", "x1", "s05", "x2", "s06", "s07", "x3", "s08", "x4", "s09", "x5", "s10", "x6", "s11", "x7", "s12", "x8"];
+const POS = {}; ORDER.forEach((id, i) => { const r = Math.floor(i / 5), cc = i % 5; POS[id] = [r % 2 ? 4 - cc : cc, r]; });
 const center = id => [POS[id][0] * PW, POS[id][1] * PH];
 const SECS = [];
 function section(id, build) {
@@ -827,6 +828,266 @@ section("s12", (g, c, id) => {
   };
 });
 
+
+/* ========================================================================================
+   WORKED EXAMPLES (x1..x8): each sits next to its topic. A sketch on the left (not to scale),
+   the numbers written step by step on the right, every line on the word that says it.
+   ======================================================================================== */
+const SX = 40;                                           // x of the written solution
+const solve = (g, items, size = 42) => eqs(g, SX, -330, items.map((it, i) => ({ size, ...it, y: it.y ?? -330 + i * 100 })));
+const nlab = (g, src, color, size = 38) => tex(g, src, { size, color });
+
+/* ---------------------------------------------------------- x1: pulling a crate */
+section("x1", (g, c, id) => {
+  const H = heading(g, "e.g.", "pulling a crate", S(id));
+  const floor = pen(g, INK, 6), blk = block(g, 300, 200), fl = el("rect", { x: -900, y: 255, width: 840, height: 34, fill: "url(#hatch)", opacity: 0 }, g);
+  const C = [-500, 155], P = [-350, 120], th = 30;
+  const F = arrow(g, COL.F, 9), Fx = arrow(g, COL.F, 5), Fy = arrow(g, COL.F, 5), W = arrow(g, COL.W, 9), N = arrow(g, COL.N, 9), Fr = arrow(g, COL.FR, 9);
+  const an = arc(g, INK, 4), thL = tex(g, "30^\\circ", { size: 38 });
+  const lF = nlab(g, "30\\ \\text{N}", COL.F), lN = nlab(g, "83.1\\ \\text{N}", COL.N), lW = nlab(g, "98.1\\ \\text{N}", COL.W), lFr = nlab(g, "16.6\\ \\text{N}", COL.FR), lFx = nlab(g, "26.0\\ \\text{N}", COL.F, 34), lFy = nlab(g, "15\\ \\text{N}", COL.F, 34);
+  const E1 = solve(g, [
+    { tex: "m = 10\\ \\text{kg},\\ F = 30\\ \\text{N},\\ \\theta = 30^\\circ,\\ \\mu = 0.2", t: c("A ten kilogram crate"), size: 38 },
+    { tex: "F_N = mg - F\\sin\\theta = 98.1 - 15 = 83.1\\ \\text{N}", t: c("Vertically"), size: 40 },
+    { tex: "f = \\mu F_N = 0.2 \\times 83.1 = 16.6\\ \\text{N}", t: c("So the friction"), size: 40 },
+    { tex: "F\\cos\\theta = 26.0\\ \\text{N}", t: c("The rope pulls forward"), size: 40 },
+    { tex: "a = \\dfrac{26.0 - 16.6}{10} = 0.94\\ \\text{m s}^{-2}", t: c("so the acceleration"), final: true, uly: 78, ulw: 520, ulColor: COL.F, size: 46, y: 140 },
+  ]);
+  return t => {
+    H(t);
+    const k = ap(t, S(id) + 0.5, 0.6);
+    floor.draw(-900, 255, -60, 255, k); set(fl, { opacity: 0.8 * k }); blk.at(C[0], C[1], 0, k);
+    const cr = c("A ten kilogram crate"), f = ap(t, cr + 1.0, 0.7), ex = [P[0] + 190 * Math.cos(th * D2R), P[1] - 190 * Math.sin(th * D2R)];
+    F.draw(P[0], P[1], ex[0], ex[1], { p: f }); lF.at(ex[0] + 20, ex[1] - 30, f, { anchor: "l" });
+    an.draw(P[0], P[1], 90, -th, 0, f); thL.at(P[0] + 120, P[1] - 18, f);
+    const w = ap(t, cr + 2.2, 0.6), v = ap(t, c("Vertically"), 0.7);
+    W.draw(C[0], C[1], C[0], C[1] + 235, { p: w }); lW.at(C[0] + 25, C[1] + 255, ap(t, c("Vertically") + 0.4, 0.4), { anchor: "l" });
+    Fx.draw(P[0], P[1], ex[0], P[1], { p: v, dash: "12 9" }); Fy.draw(ex[0], P[1], ex[0], ex[1], { p: v, dash: "12 9" });
+    lFy.at(ex[0] + 20, (P[1] + ex[1]) / 2, ap(t, c("Vertically") + 0.8, 0.4), { anchor: "l" }); lFx.at((P[0] + ex[0]) / 2, P[1] + 38, ap(t, c("The rope pulls forward") + 0.4, 0.4));
+    N.draw(C[0], C[1], C[0], C[1] - 195, { p: v }); lN.at(C[0] - 25, C[1] - 215, ap(t, c("Vertically") + 1.6, 0.4), { anchor: "r" });
+    const fr = ap(t, c("So the friction"), 0.7);
+    Fr.draw(C[0] - 150, 238, C[0] - 150 - 90, 238, { p: fr }); lFr.at(C[0] - 150 - 100, 205, ap(t, c("So the friction") + 0.6, 0.4), { anchor: "r" });
+    E1(t);
+  };
+});
+
+/* ---------------------------------------------------------- x2: weighing yourself in a lift */
+section("x2", (g, c, id) => {
+  const H = heading(g, "e.g.", "weighing yourself in a lift", S(id));
+  const shaft = el("rect", { x: -840, y: -400, width: 460, height: 860, rx: 10, fill: "none", stroke: MUTED, "stroke-width": 4, "stroke-dasharray": "14 12" }, g);
+  const cage = el("g", {}, g); el("rect", { x: -190, y: -230, width: 380, height: 460, rx: 10, fill: "#fbf7ef", stroke: INK, "stroke-width": 6 }, cage);
+  el("rect", { x: -150, y: 180, width: 300, height: 34, rx: 6, fill: "#d9cfba", stroke: INK, "stroke-width": 4 }, cage);   // the scales
+  const person = el("g", {}, cage); el("circle", { cx: 0, cy: -130, r: 36, fill: "#fbf7ef", stroke: INK, "stroke-width": 5 }, person);
+  el("path", { d: "M0,-94V40M-60,-40L0,-62L60,-40M0,40L-38,176M0,40L38,176", stroke: INK, "stroke-width": 7, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }, person);
+  const read = el("text", { x: 0, y: 207, "font-family": "Hand", "font-weight": 700, "font-size": 40, fill: INK, "text-anchor": "middle" }, cage);
+  const N = arrow(g, COL.N, 9), W = arrow(g, COL.W, 9), nL = nlab(g, "F_N", COL.N, 40), wL = nlab(g, "mg", COL.W, 40), eqm = hand(g, "mg  =  687 N  (never changes)", { size: 44, color: COL.W, weight: 700 });
+  const E1 = solve(g, [
+    { tex: "m = 70\\ \\text{kg},\\ g = 9.81", t: c("A seventy kilogram person"), size: 40 },
+    { tex: "F_N = mg = 70 \\times 9.81 = 687\\ \\text{N}", t: c("At constant speed"), final: true, ulw: 600, ulColor: COL.N, size: 42 },
+    { tex: "F_N = m(g + a) = 70 \\times 11.01 = 771\\ \\text{N}", t: c("Accelerating upward"), final: true, ulw: 680, ulColor: COL.N, size: 42 },
+    { tex: "F_N = m(g - a) = 70 \\times 8.61 = 603\\ \\text{N}", t: c("Accelerating downward"), final: true, ulw: 680, ulColor: COL.N, size: 42 },
+  ]);
+  const c1 = c("At constant speed"), c2 = c("Accelerating upward"), c3 = c("Accelerating downward"), c4 = c("The person's weight never changed");
+  const reading = track([[0, 687], [c1, 687], [c2 - 0.3, 687], [c2 + 0.5, 771], [c3 - 0.3, 771], [c3 + 0.5, 603]]);
+  const lift = track([[0, 0], [c1, 0], [c2 - 0.3, -60], [c2 + 1.5, -140], [c3 - 0.3, -140], [c3 + 1.8, 60]]);
+  return t => {
+    H(t);
+    const k = ap(t, S(id) + 0.5, 0.6), y = lift(t), r = reading(t);
+    set(shaft, { opacity: k }); cage.setAttribute("transform", `translate(-610,${y})`); cage.setAttribute("opacity", k);
+    read.textContent = `${Math.round(r)} N`;
+    const cx = -610, base = y - 10, sc = 0.27;
+    W.draw(cx + 78, base - 40, cx + 78, base - 40 + 687 * sc, { op: k * ap(t, c1, 0.5), p: 1 }); wL.at(cx + 120, base - 40 + 687 * sc - 10, k * ap(t, c1, 0.5));
+    N.draw(cx - 78, base + 175, cx - 78, base + 175 - r * sc, { op: k * ap(t, c1, 0.5) }); nL.at(cx - 125, base + 175 - r * sc + 10, k * ap(t, c1, 0.5));
+    eqm.write(-880, 520, t, c4, { speed: 0.025 });
+    E1(t);
+  };
+});
+
+/* ---------------------------------------------------------- x3: when does it slip, and then how fast? */
+section("x3", (g, c, id) => {
+  const H = heading(g, "e.g.", "slipping and sliding", S(id));
+  const inc = incline(g, { L: 800 }), blk = block(g, 170, 110);
+  const W = arrow(g, COL.W, 8), N = arrow(g, COL.N, 8), Fr = arrow(g, COL.FR, 8), Cp = arrow(g, COL.W, 5);
+  const lW = nlab(g, "49.1\\ \\text{N}", COL.W, 34), lN = nlab(g, "40.2\\ \\text{N}", COL.N, 34), lFr = nlab(g, "12.0\\ \\text{N}", COL.FR, 34), lC = nlab(g, "28.1\\ \\text{N}", COL.W, 34);
+  const cT = c("Tilt a board"), cS = c("It slips at twenty eight degrees"), cB = c("Now a five kilogram block");
+  const th = lin([[0, 0], [cT, 0], [cS - 0.2, 28], [cS + 3, 28], [cB - 0.2, 28], [cB + 1.0, 35]]);
+  const dist = lin([[0, 440], [cS, 440], [cS + 1.0, 440], [cS + 3.0, 230]]);
+  const E1 = solve(g, [
+    { tex: "\\mu_s = \\tan\\theta = \\tan 28^\\circ = 0.53", t: c("Then the coefficient"), final: true, ulw: 560, ulColor: COL.FR, size: 44, y: -330, until: cB - 0.2 },
+    { tex: "m = 5\\ \\text{kg},\\ \\theta = 35^\\circ,\\ \\mu_d = 0.3", t: c("Now a five kilogram block"), size: 40, y: -330 },
+    { tex: "mg\\sin\\theta = 28.1\\ \\text{N}", t: c("Down the slope"), size: 42, y: -230 },
+    { tex: "\\mu_d\\, mg\\cos\\theta = 0.3 \\times 40.2 = 12.0\\ \\text{N}", t: c("Friction, μd"), size: 42, y: -130 },
+    { tex: "F_{\\text{net}} = 28.1 - 12.0 = 16.1\\ \\text{N}", t: c("The resultant"), size: 42, y: -30 },
+    { tex: "a = \\dfrac{16.1}{5} = 3.2\\ \\text{m s}^{-2}", t: c("so the acceleration"), final: true, uly: 78, ulw: 380, ulColor: COL.F, size: 46, y: 100 },
+  ]);
+  return t => {
+    H(t);
+    const k = ap(t, S(id) + 0.5, 0.6), a = th(t), P0 = [-860, 300], { u, n } = inc(P0, a, k);
+    const C0 = add(add(P0, u, dist(t)), n, 55);
+    blk.at(C0[0], C0[1], -a, k);
+    const d = ap(t, cB + 0.6, 0.6), Lw = 3.6;
+    const dn = [-u[0], -u[1]], inn = [-n[0], -n[1]];
+    W.draw(C0[0], C0[1], C0[0], C0[1] + 49.1 * Lw, { p: d, op: d }); lW.at(C0[0] + 30, C0[1] + 49.1 * Lw - 8, d, { anchor: "l" });
+    N.draw(C0[0], C0[1], ...add(C0, n, 40.2 * Lw), { p: d, op: d }); lN.at(...add(add(C0, n, 40.2 * Lw + 30), [-50, 0]), d, { anchor: "r" });
+    Cp.draw(C0[0], C0[1], ...add(C0, dn, 28.1 * Lw), { p: ap(t, c("Down the slope"), 0.6), dash: "12 9", op: d }); lC.at(...add(add(C0, dn, 28.1 * Lw * 0.5), [-70, -40]), ap(t, c("Down the slope") + 0.5, 0.4), { anchor: "r" });
+    Fr.draw(...add(C0, u, 20), ...add(C0, u, 20 + 12.0 * Lw), { p: ap(t, c("Friction, μd"), 0.6), op: d }); lFr.at(...add(add(C0, u, 20 + 12.0 * Lw + 50), [0, -40]), ap(t, c("Friction, μd") + 0.5, 0.4), { anchor: "l" });
+    E1(t);
+  };
+});
+
+/* ---------------------------------------------------------- x4: a horizontal push on a ramp */
+section("x4", (g, c, id) => {
+  const H = heading(g, "e.g.", "a horizontal push on a ramp", S(id));
+  const inc = incline(g, { L: 820 }), blk = block(g, 180, 112);
+  const W = arrow(g, COL.W, 8), N = arrow(g, COL.N, 8), F = arrow(g, COL.F, 9), Fa = arrow(g, COL.F, 5), Fp = arrow(g, COL.F, 5);
+  const lF = nlab(g, "45.7\\ \\text{N}", COL.F, 36), lN = nlab(g, "108\\ \\text{N}", COL.N, 36), lW = nlab(g, "98.1\\ \\text{N}", COL.W, 36);
+  const E1 = solve(g, [
+    { tex: "m = 10\\ \\text{kg},\\ \\theta = 25^\\circ", t: c("A ten kilogram block is held"), size: 42 },
+    { tex: "F\\cos\\theta = mg\\sin\\theta\\;\\Rightarrow\\;F = mg\\tan\\theta", t: c("Along the slope"), size: 42 },
+    { tex: "F = 98.1 \\times 0.466 = 45.7\\ \\text{N}", t: c("That's ninety eight point one"), final: true, ulw: 470, ulColor: COL.F, size: 44 },
+    { tex: "F_N = mg\\cos\\theta + F\\sin\\theta", t: c("Perpendicular to the slope"), size: 42 },
+    { tex: "F_N = 88.9 + 19.3 = 108\\ \\text{N}", t: c("That's eighty eight point nine"), final: true, ulw: 400, ulColor: COL.N, size: 44 },
+    { tex: "108 > 98.1 \\;\\Rightarrow\\; F_N > mg", t: c("Bigger than the weight"), size: 42, y: 230 },
+  ]);
+  return t => {
+    H(t);
+    const k = ap(t, S(id) + 0.5, 0.6), th = 25, P0 = [-860, 330], { u, n } = inc(P0, th, k);
+    const C0 = add(add(P0, u, 470), n, 58); blk.at(C0[0], C0[1], -th, k);
+    const Lw = 2.6, f = ap(t, c("A ten kilogram block is held") + 1.2, 0.7), nn = [-n[0], -n[1]], dn = [-u[0], -u[1]];
+    W.draw(C0[0], C0[1], C0[0], C0[1] + 98.1 * Lw, { p: ap(t, c("A ten kilogram block is held") + 0.4, 0.6) }); lW.at(C0[0] + 30, C0[1] + 98.1 * Lw - 10, f, { anchor: "l" });
+    F.draw(C0[0] - 260, C0[1] - 20, C0[0] - 260 + 45.7 * 4, C0[1] - 20, { p: f }); lF.at(C0[0] - 260 + 45.7 * 2, C0[1] - 62, f);
+    const a = ap(t, c("Along the slope"), 0.6);
+    const fx = [C0[0] - 260, C0[1] - 20], fe = [fx[0] + 45.7 * 4, fx[1]], fa = add(fx, u, 45.7 * 4 * Math.cos(th * D2R));
+    N.draw(C0[0], C0[1], ...add(C0, n, 108 * Lw * 0.62), { p: ap(t, c("Perpendicular to the slope"), 0.6) }); lN.at(...add(add(C0, n, 108 * Lw * 0.62 + 36), [-50, 0]), ap(t, c("Perpendicular to the slope") + 0.5, 0.4), { anchor: "r" });
+    Fa.draw(fx[0], fx[1], ...fa, { p: a, dash: "12 9" }); Fp.draw(fa[0], fa[1], fe[0], fe[1], { p: a, dash: "12 9" });
+    E1(t);
+  };
+});
+
+/* ---------------------------------------------------------- x5: a sign on two cables */
+section("x5", (g, c, id) => {
+  const H = heading(g, "e.g.", "a sign on two cables", S(id));
+  const ceil = pen(g, INK, 7), cA = pen(g, MUTED, 5), cB = pen(g, MUTED, 5);
+  const L = [-860, -330], R = [-120, -330], r = 370, s = r * Math.sin(60 * D2R) / Math.sin(30 * D2R), PT = [L[0] + s * Math.cos(30 * D2R), L[1] + s * Math.sin(30 * D2R)];
+  const sign = el("g", {}, g); el("rect", { x: -130, y: 14, width: 260, height: 120, rx: 8, fill: "#fbf7ef", stroke: INK, "stroke-width": 5 }, sign);
+  const st = el("text", { x: 0, y: 92, "font-family": "Hand", "font-weight": 700, "font-size": 56, fill: INK, "text-anchor": "middle" }, sign); st.textContent = "10 kg";
+  const T1 = arrow(g, COL.T, 9), T2 = arrow(g, COL.T, 9), W = arrow(g, COL.W, 9), a1 = arc(g, INK, 4), a2 = arc(g, INK, 4);
+  const l1 = nlab(g, "T_1 = 49\\ \\text{N}", COL.T, 38), l2 = nlab(g, "T_2 = 85\\ \\text{N}", COL.T, 38), lW = nlab(g, "98.1\\ \\text{N}", COL.W, 38), t30 = nlab(g, "30^\\circ", INK, 36), t60 = nlab(g, "60^\\circ", INK, 36);
+  const E1 = solve(g, [
+    { tex: "m = 10\\ \\text{kg},\\ \\ \\alpha_1 = 30^\\circ,\\ \\ \\alpha_2 = 60^\\circ", t: c("A ten kilogram sign"), size: 40 },
+    { tex: "T_1\\cos 30^\\circ = T_2\\cos 60^\\circ \\;\\Rightarrow\\; T_2 = 1.73\\,T_1", t: c("Sideways"), size: 40 },
+    { tex: "T_1\\sin 30^\\circ + T_2\\sin 60^\\circ = mg", t: c("Upward"), size: 40 },
+    { tex: "2\\,T_1 = 98.1 \\;\\Rightarrow\\; T_1 = 49\\ \\text{N}", t: c("So T one is half"), final: true, ulw: 460, ulColor: COL.T, size: 44 },
+    { tex: "T_2 = 1.73 \\times 49 = 85\\ \\text{N}", t: c("And T two is"), final: true, ulw: 420, ulColor: COL.T, size: 44 },
+  ]);
+  return t => {
+    H(t);
+    const k = ap(t, S(id) + 0.5, 0.6), c0 = c("A ten kilogram sign"), kk = ap(t, c0 + 0.6, 0.7);
+    ceil.draw(-900, -330, -60, -330, k); cA.draw(L[0], L[1], PT[0], PT[1], kk); cB.draw(R[0], R[1], PT[0], PT[1], kk);
+    sign.setAttribute("transform", `translate(${PT[0]},${PT[1]})`); sign.setAttribute("opacity", kk);
+    a1.draw(L[0], L[1], 110, 0, 30, kk); a2.draw(R[0], R[1], 110, 180 - 60, 180, kk); t30.at(L[0] + 160, L[1] + 40, kk); t60.at(R[0] - 150, R[1] + 70, kk);
+    const sc = 3.06, d1 = [-Math.cos(30 * D2R), -Math.sin(30 * D2R)], d2 = [Math.cos(60 * D2R), -Math.sin(60 * D2R)];
+    const w = ap(t, c("Sideways") - 0.6, 0.6), f1 = ap(t, c("So T one is half"), 0.6), f2 = ap(t, c("And T two is"), 0.6);
+    W.draw(PT[0], PT[1] + 14, PT[0], PT[1] + 14 + 98.1 * sc, { p: w }); lW.at(PT[0] + 30, PT[1] + 14 + 98.1 * sc, w, { anchor: "l" });
+    T1.draw(PT[0], PT[1], ...add(PT, d1, 49 * sc), { p: ap(t, c("Sideways") - 0.2, 0.6) }); T2.draw(PT[0], PT[1], ...add(PT, d2, 85 * sc), { p: ap(t, c("Sideways") - 0.2, 0.6) });
+    l1.at(...add(add(PT, d1, 49 * sc + 10), [-40, -28]), f1, { anchor: "r" }); l2.at(...add(add(PT, d2, 85 * sc + 10), [40, -10]), f2, { anchor: "l" });
+    E1(t);
+  };
+});
+
+/* ---------------------------------------------------------- x6: numbers on a pulley */
+section("x6", (g, c, id) => {
+  const H = heading(g, "e.g.", "numbers on a pulley", S(id));
+  const top = pen(g, INK, 6), legL = pen(g, INK, 5);
+  const Pc = [-100, -93], wheel = el("circle", { r: 42, fill: "#fbf7ef", stroke: INK, "stroke-width": 5 }, g), hub = el("circle", { r: 7, fill: INK }, g);
+  const s1 = pen(g, MUTED, 4), s2 = pen(g, MUTED, 4), bM = block(g, 240, 150), bm = block(g, 140, 140), ML = tex(g, "3\\ \\text{kg}", { size: 44 }), mL = tex(g, "2\\ \\text{kg}", { size: 40 });
+  const T1 = arrow(g, COL.T, 8), T2 = arrow(g, COL.T, 8), W2 = arrow(g, COL.W, 8), aA = arrow(g, COL.A, 5);
+  const l1 = nlab(g, "11.8\\ \\text{N}", COL.T, 36), l2 = nlab(g, "11.8\\ \\text{N}", COL.T, 36), lW = nlab(g, "19.6\\ \\text{N}", COL.W, 36), la = nlab(g, "3.92\\ \\text{m s}^{-2}", COL.A, 34);
+  const E1 = solve(g, [
+    { tex: "M = 3\\ \\text{kg},\\ m = 2\\ \\text{kg}", t: c("Take a three kilogram block"), size: 42 },
+    { tex: "a = \\dfrac{mg}{M + m} = \\dfrac{19.62}{5} = 3.92\\ \\text{m s}^{-2}", t: c("The acceleration is"), final: true, uly: 78, ulw: 620, ulColor: COL.A, size: 44, y: -240 },
+    { tex: "T = Ma = 3 \\times 3.92 = 11.8\\ \\text{N}", t: c("The tension is"), final: true, ulw: 520, ulColor: COL.T, size: 44, y: -100 },
+    { tex: "mg - T = 19.6 - 11.8 = 7.85\\ \\text{N}", t: c("Check the hanging mass"), size: 42, y: 20 },
+    { tex: "ma = 2 \\times 3.92 = 7.85\\ \\text{N}\\ \\checkmark", t: c("two times three point nine two is"), size: 42, y: 120 },
+  ]);
+  const cA = c("The acceleration is"), disp = track([[0, 0], [cA, 0], [E(id), 150]]);
+  return t => {
+    H(t);
+    const k = ap(t, S(id) + 0.4, 0.8), d = disp(t);
+    top.draw(-900, 10, -100, 10, k); legL.draw(-860, 10, -860, 230, k);
+    set(wheel, { cx: Pc[0], cy: Pc[1] + 70, opacity: k }); set(hub, { cx: Pc[0], cy: Pc[1] + 70, opacity: k });
+    const bx = -600 + d, hy = 160 + d;
+    bM.at(bx, -65, 0, k); ML.at(bx, -65, k); bm.at(Pc[0] + 42, hy, 0, k); mL.at(Pc[0] + 42, hy, k);
+    s1.draw(bx + 120, -66, Pc[0], -66, k); s2.draw(Pc[0] + 42, Pc[1] + 70, Pc[0] + 42, hy - 70, k);
+    const tk = ap(t, c("The tension is"), 0.6), wk = ap(t, c("Check the hanging mass"), 0.6), ak = ap(t, cA + 0.8, 0.6);
+    T1.draw(bx + 120, -66, bx + 120 + 11.8 * 8, -66, { p: tk }); l1.at(bx + 120 + 11.8 * 4, -118, tk);
+    T2.draw(Pc[0] + 42, hy - 70, Pc[0] + 42, hy - 70 - 11.8 * 8, { p: tk }); l2.at(Pc[0] + 100, hy - 70 - 11.8 * 5, tk, { anchor: "l" });
+    W2.draw(Pc[0] + 42, hy, Pc[0] + 42, hy + 19.6 * 8, { p: wk }); lW.at(Pc[0] + 100, hy + 19.6 * 6, wk, { anchor: "l" });
+    aA.draw(bx - 70, -190, bx + 70, -190, { p: ak, dash: "10 8" }); la.at(bx, -230, ak);
+    E1(t);
+  };
+});
+
+/* ---------------------------------------------------------- x7: will it float? */
+section("x7", (g, c, id) => {
+  const H = heading(g, "e.g.", "will it float?", S(id));
+  const tank = el("rect", { x: -880, y: -240, width: 700, height: 700, fill: "#d6e8f6", stroke: INK, "stroke-width": 6 }, g), surf = el("path", { stroke: "#2c6fb0", "stroke-width": 4, fill: "none" }, g);
+  const blk = block(g, 260, 200, { fill: "#f1e3c4" }), sub = el("rect", { fill: "url(#hatch)", opacity: 0 }, g);
+  const Fb = arrow(g, COL.B, 9), Wb = arrow(g, COL.W, 9), lF = nlab(g, "F_b = 9.81\\ \\text{N}", COL.B, 38), lW = nlab(g, "mg = 7.85\\ \\text{N}", COL.W, 38), lF2 = nlab(g, "F_b = 7.85\\ \\text{N}", COL.B, 38), l80 = hand(g, "80% under water", { size: 46, color: COL.B, weight: 700 });
+  const E1 = solve(g, [
+    { tex: "m = 0.80\\ \\text{kg},\\ V = 1.0\\times10^{-3}\\ \\text{m}^3", t: c("A wooden block"), size: 40, y: -330 },
+    { tex: "F_b = \\rho V g = 1000 \\times 0.001 \\times 9.81 = 9.81\\ \\text{N}", t: c("Fully submerged"), size: 40, y: -230 },
+    { tex: "mg = 0.80 \\times 9.81 = 7.85\\ \\text{N}", t: c("The weight is only"), size: 40, y: -130 },
+    { tex: "F_b > mg\\;\\Rightarrow\\;\\text{it rises}", t: c("So the buoyant force wins"), size: 42, y: -30 },
+    { tex: "V_{\\text{sub}} = \\dfrac{m}{\\rho} = \\dfrac{0.80}{1000} = 0.80\\times10^{-3}\\ \\text{m}^3", t: c("It floats when"), uly: 78, size: 40, y: 90 },
+    { tex: "\\Rightarrow\\ 80\\%\\ \\text{submerged}", t: c("eighty percent"), final: true, ulw: 380, ulColor: COL.B, size: 46, y: 250 },
+  ]);
+  const cR = c("So the buoyant force wins"), yb = track([[0, 190], [cR - 0.2, 190], [cR + 2.2, -60]]);
+  return t => {
+    H(t);
+    const k = ap(t, S(id) + 0.4, 0.8); set(tank, { opacity: k });
+    let d = ""; for (let x = -880; x <= -180; x += 20) d += `${x === -880 ? "M" : "L"}${x},${-120 + 5 * Math.sin(x * 0.03 + t * 2)}`; set(surf, { d, opacity: k });
+    const y = yb(t), bx = -530, top = y - 100, rise = ap(t, cR + 2.4, 0.5);
+    blk.at(bx, y, 0, ap(t, c("A wooden block"), 0.5));
+    const subH = Math.max(0, Math.min(200, top + 200 - (-120)));
+    set(sub, { x: bx - 130, y: Math.max(top, -120), width: 260, height: Math.max(0, y + 100 - Math.max(top, -120)), opacity: 0.55 * ap(t, c("A wooden block"), 0.5) });
+    const fk = ap(t, c("Fully submerged"), 0.6), wk = ap(t, c("The weight is only"), 0.6), fl = rise;
+    const fbl = lerp(9.81 * 17, 7.85 * 17, ease(fl));
+    Fb.draw(bx, y, bx, y - fbl, { p: fk }); lF.at(bx + 40, y - fbl - 22, fk * (1 - fl), { anchor: "l" }); lF2.at(bx + 40, y - fbl - 22, fl, { anchor: "l" });
+    Wb.draw(bx, y, bx, y + 7.85 * 17, { p: wk }); lW.at(bx + 40, y + 7.85 * 17 - 6, wk, { anchor: "l" });
+    l80.write(-870, 520, t, c("eighty percent"), { speed: 0.03 });
+    E1(t);
+  };
+});
+
+/* ---------------------------------------------------------- x8: a steel ball in oil */
+section("x8", (g, c, id) => {
+  const H = heading(g, "e.g.", "a steel ball in oil", S(id));
+  const tube = el("rect", { x: -760, y: -400, width: 300, height: 840, rx: 18, fill: "#f3e3b5", stroke: INK, "stroke-width": 6 }, g), ball = el("circle", { r: 34, fill: "#9aa3b2", stroke: INK, "stroke-width": 4 }, g);
+  const W = arrow(g, COL.W, 9), B = arrow(g, COL.B, 9), D = arrow(g, COL.D, 9), lW = nlab(g, "W", COL.W, 40), lB = nlab(g, "F_b", COL.B, 40), lD = nlab(g, "F_d", COL.D, 40), bal = hand(g, "F_b + F_d = W  →  steady speed", { size: 46, color: COL.D, weight: 700 });
+  const E1 = solve(g, [
+    { tex: "r = 2.0\\ \\text{mm},\\ \\rho_s = 7800,\\ \\rho_f = 900,\\ \\eta = 0.90", t: c("Drop a steel ball bearing"), size: 38, y: -330 },
+    { tex: "v_t = \\dfrac{2 r^2 g(\\rho_s - \\rho_f)}{9\\eta}", t: c("The terminal speed is"), uly: 78, size: 46, y: -220 },
+    { tex: "r^2 = 4.0\\times10^{-6}\\ \\text{m}^2,\\quad \\rho_s - \\rho_f = 6900", t: c("The radius squared"), size: 38, y: -70 },
+    { tex: "v_t = \\dfrac{2(4.0\\times10^{-6})(9.81)(6900)}{9(0.90)}", t: c("So two, times"), uly: 78, size: 42, y: 60 },
+    { tex: "= 0.067\\ \\text{m s}^{-1}\\ \\approx\\ 7\\ \\text{cm s}^{-1}", t: c("point zero six seven"), final: true, ulw: 560, ulColor: COL.D, size: 46, y: 220 },
+  ]);
+  const cD = c("Drop a steel ball bearing"), tau = 1.2, v = t => (t < cD + 0.8 ? 0 : 1 - Math.exp(-(t - cD - 0.8) / tau));
+  return t => {
+    H(t);
+    const k = ap(t, S(id) + 0.5, 0.6); set(tube, { opacity: k });
+    const vv = v(t), y = -330 + (t < cD + 0.8 ? 0 : 12 * ((t - cD - 0.8) - tau * (1 - Math.exp(-(t - cD - 0.8) / tau))));
+    set(ball, { cx: -610, cy: y, opacity: k });
+    const sc = 5.5e3;                                      // px per N (not to scale with the tube)
+    const Wl = 2.56e-3 * sc * 11, Bl = 2.96e-4 * sc * 11, Dl = Wl - Bl;
+    const wk = ap(t, cD + 1.2, 0.6);
+    W.draw(-640, y + 20, -640, y + 20 + Wl, { p: wk }); lW.at(-690, y + Wl + 6, wk);
+    B.draw(-585, y - 10, -585, y - 10 - Bl, { p: wk }); lB.at(-540, y - Bl - 12, wk);
+    D.draw(-610, y - 40, -610, y - 40 - Dl * vv, { op: wk * (vv > 0.05 ? 1 : 0) }); lD.at(-560, y - 40 - Dl * vv - 8, wk * (vv > 0.5 ? 1 : 0));
+    bal.write(-880, 500, t, c("The terminal speed is") + 0.5, { speed: 0.025 });
+    E1(t);
+  };
+});
+
 /* ========================================================== s13 — the recipe (drawn huge across the whole sheet) */
 const REC = el("g", {}, world);
 const recipe = ["1  isolate the object: only forces ON it", "2  axes along / across the surface", "3  split: cos touching θ, sin across", "4  balance each direction"]
@@ -837,7 +1098,7 @@ function updateRecipe(t) {
   const [x0, y0] = [350, 150];
   const T = [c("Isolate the object"), c("Choose axes"), c("Split each force"), c("Then balance")];
   const out = ap(t, c("So mg sin θ isn't"), 0.6);
-  recipe.forEach((r, i) => r.write(x0, y0 + i * 600 + 400, t, T[i], { speed: 0.025, op: 1 - out }));
+  recipe.forEach((r, i) => r.write(x0, y0 + i * 900 + 400, t, T[i], { speed: 0.025, op: 1 - out }));
   const dim = ap(t, S(id) + 1.5, 1) * (1 - out);
   for (const s of SECS) s.g.setAttribute("opacity", 1 - 0.72 * dim);
   finale.write(center("s06")[0] - 790, center("s06")[1] - 200, t, c("It's just one side"), { speed: 0.03 });
@@ -851,6 +1112,7 @@ ids.forEach((id, i) => {
   const [cx, cy] = center(id);
   key(S(id) + (i === 0 ? 0 : 0.9), [cx, cy], 1);
   key(E(id) - 0.5, [cx, cy], 1);
+  if (i < ids.length - 1) { const [nx, ny] = center(ids[i + 1]); key((E(id) - 0.5 + S(ids[i + 1]) + 0.9) / 2, [(cx + nx) / 2, (cy + ny) / 2], 0.8); }
 });
 { // s06: turn the paper so the slope lies flat while the axes go in, then turn back
   const c = p => cue("s06", p), [cx, cy] = center("s06");
@@ -861,10 +1123,10 @@ ids.forEach((id, i) => {
   key(c("Here's the key geometry") + 1.6, [cx, cy], 1, 0);
 }
 { // s13: pull back over the whole worksheet, then dive into mg sin θ
-  const c = p => cue("s13", p), all = [3 * PW / 2, PH];
-  key(S("s13") + 0.2, center("s12"), 1);
-  key(S("s13") + 2.6, all, 0.205);
-  key(c("So mg sin θ isn't") - 0.1, all, 0.205);
+  const c = p => cue("s13", p), all = [2 * PW, 1.5 * PH];
+  key(S("s13") + 0.2, center("x8"), 1);
+  key(S("s13") + 2.6, all, 0.168);
+  key(c("So mg sin θ isn't") - 0.1, all, 0.168);
   key(c("It's just one side"), [center("s06")[0] - 60, center("s06")[1] + 80], 1.13);
   key(TOTAL, [center("s06")[0] - 40, center("s06")[1] + 70], 1.15);
 }

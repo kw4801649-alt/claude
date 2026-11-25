@@ -1,18 +1,18 @@
 # Contact Forces, Derived (IB Physics SL · A.2)
 
-A 12-minute animated derivation of every contact force in the IB Physics SL syllabus (first assessment 2025).
+A 17-minute animated derivation, with eight worked numerical examples, of every contact force in the IB Physics SL syllabus (first assessment 2025).
 It shows where each term on a free-body diagram comes from, with the trigonometry made visible.
 It excludes elastic forces, circular motion and kinematics.
 
-**Covered:**
+**Covered:** (each topic is followed by a worked example where marked ★)
 - resolving a force
-- the normal force: on a flat surface, with angled pulls and pushes, and in a lift
+- the normal force: on a flat surface, with angled pulls and pushes ★ crate pulled by a rope, and in a lift ★ weighing yourself
 - the inclined plane: **mg sin θ** and **mg cos θ**, with a moving proof that the angle between mg and the slope normal is θ
-- friction on a slope and the slip angle **μs = tan θ**, then sliding friction
-- a horizontal push on a slope (giving F_N = mg / cos θ)
-- tension: a single string, two strings at angles (T = mg / 2 sin α) with the closed triangle of forces, and a pulley
-- buoyancy derived from the pressure difference (F_b = ρVg), and floating
-- Stokes' drag and terminal speed (v_t = 2r²g(ρs − ρf) / 9η)
+- friction on a slope and the slip angle **μs = tan θ**, then sliding friction ★ slip angle and acceleration
+- a horizontal push on a slope (giving F_N = mg / cos θ) ★ 10 kg on a 25° ramp
+- tension: a single string, two strings at angles (T = mg / 2 sin α) with the closed triangle of forces ★ a sign on cables at 30° and 60°, and a pulley ★ numbers
+- buoyancy derived from the pressure difference (F_b = ρVg), and floating ★ will a block float?
+- Stokes' drag and terminal speed (v_t = 2r²g(ρs − ρf) / 9η) ★ steel ball in oil
 
 **Look:** one long sheet of graph paper. The camera glides from diagram to diagram, and once rotates the paper
 so the slope lies level.
