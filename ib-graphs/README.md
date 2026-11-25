@@ -67,7 +67,7 @@ BURN_SUBS=1 bash tools/assemble.sh        # …or with subtitles burned in
 
 `npm run preview` serves `http://127.0.0.1:8080/scene/index.html?preview=1`, which gives a scrubber with narration playback.
 
-**Expected result:** about **10:45** (645.4 s), 19,362 frames, H.264 1920×1080 30 fps, AAC 48 kHz at about −16 LUFS,
+**Expected result:** about **10:45** (645.0 s), 19,349 frames, H.264 1920×1080 30 fps, AAC 48 kHz at about −16 LUFS,
 with an English subtitle track.
 
 ## Pace and pronunciation

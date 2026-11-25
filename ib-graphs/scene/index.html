@@ -518,7 +518,7 @@ section("s05", (g, c, id) => {
     const fr = ap(t, S(id) + 0.5, 0.6); P.show(fr);
     ln.set(ap(t, S(id) + 0.7, 1.4) * 6, fr);
     const cs = c("Start at the initial velocity");
-    lu.at(0, 2, ap(t, cs, 0.4), { dx: -66 }); lv.at(6, 8, ap(t, cs + 1.4, 0.4), { dy: -34 }); lt.at(6, 0, ap(t, cs + 2.6, 0.4), { dy: -30 });
+    lu.at(0, 2, ap(t, cs, 0.4), { dx: -42, dy: -34 }); lv.at(6, 8, ap(t, cs + 1.4, 0.4), { dy: -34 }); lt.at(6, 0, ap(t, cs + 2.6, 0.4), { dy: -30 });
     const cg = c("The gradient is the acceleration");
     run.at(1, 3, 4, 3, ap(t, cg + 0.2, 0.5)); rise.at(4, 3, 4, 6, ap(t, cg + 0.8, 0.5)); dT.at(2.5, 3, ap(t, cg + 0.7, 0.4), { dy: 34 }); dV.at(4, 4.5, ap(t, cg + 1.3, 0.4), { dx: 44 });
     const fadeG = 1 - ap(t, c("Now the displacement"), 0.5);
