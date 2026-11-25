@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Reading Motion and Momentum Graphs</title>
+<!--
+  scene/index.html: "Reading Motion and Momentum Graphs" (IB Physics SL, A.1 + A.2)
+
+  One long blueprint-style sheet. The camera glides from graph to graph. Every curve is
+  drawn live while a cart, ball or projectile moves; tangents, shaded areas and guides show
+  what the gradient and the area mean; equations (KaTeX) write themselves on the spoken word.
+
+  Timing: audio/timings.json (from tools/tts.py) holds every spoken sentence;
+  cue(scene, "phrase") gives the moment a phrase is spoken.
+  Determinism: every frame is a pure function of t (no clocks, no randomness).
+  Served by render/serve.mjs: /scene/index.html (render), ?preview=1 (scrub+audio), ?t=95 (still)
+-->
+<link rel="stylesheet" href="/node_modules/katex/dist/katex.min.css">
+<style>
+  @font-face { font-family: "Hand"; font-weight: 600; src: url("/node_modules/@fontsource/caveat/files/caveat-latin-600-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Hand"; font-weight: 700; src: url("/node_modules/@fontsource/caveat/files/caveat-latin-700-normal.woff2") format("woff2"); }
+  html, body { margin: 0; padding: 0; background: #0e1a2b; overflow: hidden; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0; background: #0e1a2b; }
+  svg#sheet { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+  .fo { display: flex; align-items: center; line-height: 1; white-space: nowrap; }
+  .fo .katex { font-size: 1em; }
+  #fade { position: absolute; inset: 0; background: #0e1a2b; opacity: 1; pointer-events: none; }
+  #err { position: absolute; inset: 0; color: #ff8080; font: 28px/1.4 monospace; padding: 80px; display: none; }
+  #controls { position: fixed; left: 0; right: 0; bottom: 0; display: none; gap: 12px; align-items: center; padding: 10px 16px;
+              background: rgba(10,18,32,0.95); color: #fff; font: 14px/1.2 system-ui, sans-serif; }
+  #controls input[type=range] { flex: 1; }
+  #controls button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 0; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <svg id="sheet" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+        <path d="M60 0H0V60" fill="none" stroke="#162840" stroke-width="2"/>
+      </pattern>
+      <pattern id="hatch" width="22" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="22" stroke="#5d7088" stroke-width="3"/>
+      </pattern>
+    </defs>
+    <g id="cam"><rect id="paper" x="-4000" y="-3000" width="16000" height="10000" fill="url(#grid)"/><g id="world"></g></g>
+  </svg>
+  <div id="fade"></div>
+  <div id="err"></div>
+</div>
+<div id="controls">
+  <button id="play">Play</button>
+  <input id="scrub" type="range" min="0" max="500" step="0.0333" value="0">
+  <span id="clock">0:00.0</span>
+</div>
+
+<script type="module">
+import katex from "/node_modules/katex/dist/katex.mjs";
+
+/* ========================================================== timeline from the narration */
+const params = new URLSearchParams(location.search);
+const PREVIEW = params.has("preview");
+const fail = msg => { const e = document.getElementById("err"); e.style.display = "block"; e.textContent = msg; throw new Error(msg); };
+const CFG = await (await fetch("/config/scenes.json")).json();
+const tlRes = await fetch("/audio/timings.json");
+if (!tlRes.ok) fail("audio/timings.json not found. Run `python tools/tts.py` first: the scene is timed to the narration.");
+const TL = await tlRes.json();
+const TOTAL = TL.total;
+const SC = {};
+for (const s of CFG.scenes) { const t = TL.scenes[s.id]; if (!t) fail(`timings.json has no ${s.id}; re-run tools/tts.py`); SC[s.id] = { start: t.start, end: t.start + t.slot, t }; }
+const S = id => SC[id].start, E = id => SC[id].end;
+function cue(id, phrase, { nth = 1, at = "start" } = {}) {
+  const p = phrase.toLowerCase(); let count = 0;
+  for (const seg of SC[id].t.segments) for (const s of seg.sentences) {
+    const txt = s.text.toLowerCase(); let from = 0, idx;
+    while ((idx = txt.indexOf(p, from)) >= 0) {
+      if (++count === nth) { const k = (at === "end" ? idx + p.length : idx) / txt.length; return SC[id].start + s.start + k * (s.end - s.start); }
+      from = idx + 1;
+    }
+  }
+  fail(`Narration cue not found: ${id} "${phrase}" #${nth}`);
+}
+
+/* ========================================================== math */
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const smooth = (e0, e1, x) => { const k = clamp((x - e0) / (e1 - e0)); return k * k * (3 - 2 * k); };
+const ease = k => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const D2R = Math.PI / 180;
+const ap = (t, t0, d = 0.45) => smooth(t0, t0 + d, t);                 // appear
+const win = (t, a, b, fi = 0.45, fo = 0.45) => Math.min(smooth(a, a + fi, t), 1 - smooth(b - fo, b, t));
+function track(keys) {
+  keys = keys.slice().sort((a, b) => a[0] - b[0]);
+  return t => {
+    if (t <= keys[0][0]) return keys[0][1];
+    for (let i = 0; i < keys.length - 1; i++) { const [t0, v0] = keys[i], [t1, v1] = keys[i + 1]; if (t < t1) return t1 - t0 < 1e-6 ? v1 : lerp(v0, v1, ease((t - t0) / (t1 - t0))); }
+    return keys[keys.length - 1][1];
+  };
+}
+const fmt = (x, d = 2) => x.toFixed(d);
+
+/* ========================================================== drawing kit (SVG + KaTeX) */
+const NS = "http://www.w3.org/2000/svg";
+const INK = "#e9eff8", PAPER = "#0e1a2b", MUTED = "#8aa0bf";
+const COL = { s: "#3fd0e8", v: "#ffb347", a: "#ff6b9a", F: "#ff7a59", p: "#8fe36b", W: "#ff9a3c", D: "#b98cff", G: "#7be0b0", c1: "#6fb4ff", c2: "#ff8fb3" };
+function el(tag, attrs = {}, parent = null) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function set(e, attrs) { for (const k in attrs) e.setAttribute(k, attrs[k]); }
+const world = document.getElementById("world");
+
+/** A force arrow. draw(x1,y1,x2,y2,{p (grow 0..1), op, dash}) */
+function arrow(parent, color, w = 7) {
+  const g = el("g", {}, parent);
+  const line = el("line", { stroke: color, "stroke-width": w, "stroke-linecap": "round" }, g);
+  const head = el("path", { fill: color }, g);
+  return {
+    g, draw(x1, y1, x2, y2, { p = 1, op = 1, dash = null } = {}) {
+      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy), L = len * p;
+      if (op < 0.005 || L < 2) { g.setAttribute("opacity", 0); return; }
+      const ux = dx / len, uy = dy / len, hl = Math.min(w * 4.2, L * 0.5), hw = w * 2.3;
+      const ex = x1 + ux * L, ey = y1 + uy * L, bx = ex - ux * hl, by = ey - uy * hl;
+      set(line, { x1, y1, x2: bx, y2: by, "stroke-dasharray": dash || "none" });
+      set(head, { d: `M${ex},${ey}L${bx - uy * hw},${by + ux * hw}L${bx + uy * hw},${by - ux * hw}Z` });
+      g.setAttribute("opacity", op);
+    } };
+}
+/** A pen line that draws itself (p 0..1). */
+function pen(parent, color = INK, w = 4, extra = {}) {
+  const e = el("line", { stroke: color, "stroke-width": w, "stroke-linecap": "round", fill: "none", ...extra }, parent);
+  return { e, draw(x1, y1, x2, y2, p = 1, op = 1) { const L = Math.hypot(x2 - x1, y2 - y1); set(e, { x1, y1, x2, y2, opacity: op }); if (!extra["stroke-dasharray"]) set(e, { "stroke-dasharray": `${L} ${L + 1}`, "stroke-dashoffset": L * (1 - clamp(p)) }); } };
+}
+function poly(parent, attrs) { const e = el("path", attrs, parent); return { e, draw(pts, op = 1, close = true) { e.setAttribute("d", "M" + pts.map(p => `${p[0]},${p[1]}`).join("L") + (close ? "Z" : "")); e.setAttribute("opacity", op); } }; }
+/** KaTeX math. at(x, y, op, {anchor:'c'|'l'|'r', rot, scale}) */
+function tex(parent, src, { size = 46, color = INK, w = 1100, h = 170 } = {}) {
+  const g = el("g", {}, parent);
+  const fo = el("foreignObject", { width: w, height: h, y: -h / 2 }, g);
+  const div = document.createElement("div");
+  div.className = "fo"; div.style.width = w + "px"; div.style.height = h + "px"; div.style.fontSize = size + "px"; div.style.color = color;
+  div.innerHTML = katex.renderToString(src, { throwOnError: true, strict: false });
+  fo.appendChild(div);
+  return { g, div, at(x, y, op = 1, { anchor = "c", rot = 0, scale = 1, dy = 0 } = {}) {
+    if (op < 0.005) { g.setAttribute("opacity", 0); return; }
+    div.style.justifyContent = anchor === "l" ? "flex-start" : anchor === "r" ? "flex-end" : "center";
+    fo.setAttribute("x", anchor === "l" ? 0 : anchor === "r" ? -w : -w / 2);
+    g.setAttribute("transform", `translate(${x},${y + dy}) rotate(${rot}) scale(${scale})`);
+    g.setAttribute("opacity", op);
+  } };
+}
+/** Handwriting (Caveat) that writes itself letter by letter. */
+function hand(parent, text, { size = 52, color = INK, anchor = "start", weight = 600 } = {}) {
+  const e = el("text", { "font-family": "Hand", "font-weight": weight, "font-size": size, fill: color, "text-anchor": anchor }, parent);
+  return { e, write(x, y, t, t0, { op = 1, speed = 0.035, txt = text, rot = 0 } = {}) {
+    const n = Math.floor(txt.length * clamp((t - t0) / Math.max(0.2, txt.length * speed)));
+    if (t < t0 || op < 0.005) { e.setAttribute("opacity", 0); return; }
+    e.textContent = txt.slice(0, n); set(e, { x, y, opacity: op, transform: rot ? `rotate(${rot} ${x} ${y})` : "" });
+  } };
+}
+/** Angle arc between screen directions a0..a1 (degrees, clockwise from +x on screen). */
+function arc(parent, color = INK, w = 3.5) {
+  const e = el("path", { stroke: color, "stroke-width": w, fill: "none", "stroke-linecap": "round" }, parent);
+  return { e, draw(cx, cy, r, a0, a1, op = 1) {
+    if (op < 0.005 || Math.abs(a1 - a0) < 0.3) { e.setAttribute("opacity", 0); return; }
+    const p0 = [cx + r * Math.cos(a0 * D2R), cy + r * Math.sin(a0 * D2R)], p1 = [cx + r * Math.cos(a1 * D2R), cy + r * Math.sin(a1 * D2R)];
+    const sweep = a1 > a0 ? 1 : 0, large = Math.abs(a1 - a0) > 180 ? 1 : 0;
+    set(e, { d: `M${p0[0]},${p0[1]}A${r},${r} 0 ${large} ${sweep} ${p1[0]},${p1[1]}`, opacity: op });
+  } };
+}
+/** Right-angle mark at corner c with unit directions u, v (screen). */
+function rightMark(parent, color = INK) {
+  const e = el("path", { stroke: color, "stroke-width": 3, fill: "none" }, parent);
+  return { draw(c, u, v, s = 26, op = 1) { const a = [c[0] + u[0] * s, c[1] + u[1] * s], b = [a[0] + v[0] * s, a[1] + v[1] * s], d = [c[0] + v[0] * s, c[1] + v[1] * s]; set(e, { d: `M${a[0]},${a[1]}L${b[0]},${b[1]}L${d[0]},${d[1]}`, opacity: op }); } };
+}
+/** A rectangle "block" centred at (x, y), rotated rot degrees (screen). */
+function block(parent, w, h, { fill = "#fbf7ef", stroke = INK } = {}) {
+  const e = el("rect", { width: w, height: h, x: -w / 2, y: -h / 2, rx: 6, fill, stroke, "stroke-width": 4 }, parent);
+  return { e, at(x, y, rot = 0, op = 1) { set(e, { transform: `translate(${x},${y}) rotate(${rot})`, opacity: op }); } };
+}
+/** Equation stack: lines appear on cue; a pen underline marks results. */
+function eqs(parent, x, y, items, { size = 46, gap = 100 } = {}) {
+  const lines = items.map((it, i) => ({ ...it, m: tex(parent, it.tex, { size: it.size || size, color: it.color || INK }), y: it.y ?? y + i * gap,
+    ul: it.final ? pen(parent, it.ulColor || COL.FR, 4) : null }));
+  return t => { for (const L of lines) {
+    const k = ap(t, L.t, 0.4) * (L.until ? 1 - ap(t, L.until, 0.4) : 1);
+    L.m.at(x + (L.dx || 0), L.y, k, { anchor: "l", dy: (1 - k) * 12 });
+    if (L.ul) L.ul.draw(x + (L.dx || 0) - 6, L.y + (L.uly ?? 40), x + (L.dx || 0) + (L.ulw || 420), L.y + (L.uly ?? 40), ap(t, L.t + 0.5, 0.6), k);
+  } };
+}
+const unit = a => [Math.cos(a * D2R), Math.sin(a * D2R)];   // screen angle, clockwise from +x
+const add = (p, v, s = 1) => [p[0] + v[0] * s, p[1] + v[1] * s];
+
+/* ========================================================== the sheet layout (a snake of 5 x 3 panels) */
+const PW = 2300, PH = 1500;
+const POS = { s01: [0, 0], s02: [1, 0], s03: [2, 0], s04: [3, 0], s05: [4, 0], s06: [4, 1], s07: [3, 1], s08: [2, 1], s09: [1, 1], s10: [0, 1], s11: [0, 2], s12: [1, 2], s13: [2, 2], s14: [3, 2], s15: [4, 2] };
+const center = id => [POS[id][0] * PW, POS[id][1] * PH];
+const SECS = [];
+function section(id, build) {
+  const [cx, cy] = center(id);
+  const g = el("g", { transform: `translate(${cx},${cy})` }, world);
+  const c = (p, o) => cue(id, p, o);
+  SECS.push({ id, g, update: build(g, c, id) });
+}
+/** Little handwritten section heading in the corner of each panel (part of the page, not an interface bar). */
+function heading(g, num, text, t0) {
+  const h = hand(g, `${num}  ${text}`, { size: 58, color: MUTED, weight: 700 });
+  const u = pen(g, MUTED, 3);
+  return t => { h.write(-880, -440, t, t0, { speed: 0.02 }); u.draw(-884, -420, -884 + 26 * (num.length + text.length + 2) * 0.62 * 58 / 52, -420, ap(t, t0 + 0.4, 0.8), 0.7); };
+}
+
+/* ========================================================== graph kit (data coordinates -> SVG) */
+const lin = keys => t => {                       // piecewise-LINEAR timing map (keys: [time, value])
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 0; i < keys.length - 1; i++) { const [t0, v0] = keys[i], [t1, v1] = keys[i + 1]; if (t < t1) return t1 - t0 < 1e-6 ? v1 : lerp(v0, v1, (t - t0) / (t1 - t0)); }
+  return keys[keys.length - 1][1];
+};
+/** cumulative integral of fn on [0,T] (table lookup, deterministic) */
+function integ(fn, T, n = 1600) {
+  const tab = [0], h = T / n;
+  for (let i = 1; i <= n; i++) tab.push(tab[i - 1] + 0.5 * h * (fn((i - 1) * h) + fn(i * h)));
+  return t => { const x = clamp(t, 0, T) / h, i = Math.min(n - 1, Math.floor(x)); return lerp(tab[i], tab[i + 1], x - i); };
+}
+const GRIDC = "#1d3050";
+const BAND_NEG = "#ff6b6b";
+
+/** One graph. Geometry in px: width w, height h, time 0..T, value lo..hi. Everything inside is drawn in data coordinates. */
+function Graph(parent, { x = 0, y = 0, w = 720, h = 230, T = 8, lo = 0, hi = 10, color = INK, ylab = "", xlab = "t\\,/\\,\\text{s}",
+  yticks = [], xticks = [], xtl = true, size = 34 } = {}) {
+  const g = el("g", { transform: `translate(${x},${y})` }, parent);
+  const X = t => (t / T) * w, Y = v => h * (hi - v) / (hi - lo), y0 = Y(clamp(0, lo, hi));
+  const frame = el("g", {}, g);
+  let gd = ""; for (const v of yticks) gd += `M0,${Y(v)}H${w}`; for (const t of xticks) gd += `M${X(t)},0V${h}`;
+  el("path", { d: gd, stroke: GRIDC, "stroke-width": 2, fill: "none" }, frame);
+  el("path", { d: `M0,${h}V-6M0,${y0}H${w + 4}`, stroke: INK, "stroke-width": 3.5, fill: "none", "stroke-linecap": "round" }, frame);
+  el("path", { d: `M-9,8L0,-12L9,8ZM${w - 2},${y0 - 9}L${w + 16},${y0}L${w - 2},${y0 + 9}Z`, fill: INK }, frame);
+  const tl = (txt, px, py, anchor) => { const e = el("text", { x: px, y: py, "font-family": "Hand", "font-weight": 600, "font-size": 30, fill: MUTED, "text-anchor": anchor }, frame); e.textContent = txt; };
+  for (const v of yticks) tl(String(v), -14, Y(v) + 10, "end");
+  if (xtl) for (const t of xticks) tl(String(t), X(t), (lo < 0 ? h : y0) + 36, "middle");
+  const yl = tex(frame, ylab, { size, color }), xl = xtl ? tex(frame, xlab, { size, color: MUTED }) : null;
+  yl.at(18, 4, 1, { anchor: "l" }); if (xl) xl.at(w + 26, y0 + 4, 1, { anchor: "l" });
+  const api = { g, frame, X, Y, w, h, T, lo, hi, y0,
+    show(op) { frame.setAttribute("opacity", op); },
+    /** a curve that draws itself up to time u */
+    plot(fn, { color: c = INK, w: sw = 6, from = 0, to = T, n = 240, dash = null } = {}) {
+      const e = el("path", { stroke: c, "stroke-width": sw, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }, g);
+      if (dash) e.setAttribute("stroke-dasharray", dash);
+      return { e, set(u, op = 1) {
+        const b = Math.min(u, to);
+        if (op < 0.005 || b <= from) { e.setAttribute("opacity", 0); return; }
+        const m = Math.max(2, Math.ceil((b - from) / (to - from) * n)); let d = "";
+        for (let i = 0; i <= m; i++) { const t = from + (b - from) * i / m; d += `${i ? "L" : "M"}${X(t).toFixed(1)},${Y(fn(t)).toFixed(1)}`; }
+        e.setAttribute("d", d); e.setAttribute("opacity", op);
+      } };
+    },
+    /** shaded band between fnTop and fnBot (default the zero line) from a to b */
+    band(fnTop, { color: c = INK, op0 = 0.32, bot = () => 0, part = null } = {}) {
+      const e = el("path", { fill: c, stroke: "none" }, g);
+      const cl = v => (part === "pos" ? Math.max(v, 0) : part === "neg" ? Math.min(v, 0) : v);
+      return { e, set(a, b, op = 1, fill = null) {
+        a = clamp(a, 0, T); b = clamp(b, 0, T);
+        if (op < 0.005 || b - a < 1e-3) { e.setAttribute("opacity", 0); return; }
+        const m = 90; let d = "";
+        for (let i = 0; i <= m; i++) { const t = a + (b - a) * i / m; d += `${i ? "L" : "M"}${X(t).toFixed(1)},${Y(cl(fnTop(t))).toFixed(1)}`; }
+        for (let i = m; i >= 0; i--) { const t = a + (b - a) * i / m; d += `L${X(t).toFixed(1)},${Y(cl(bot(t))).toFixed(1)}`; }
+        e.setAttribute("d", d + "Z"); e.setAttribute("opacity", op0 * op); if (fill) e.setAttribute("fill", fill);
+      } };
+    },
+    dot(c, r = 11) { const e = el("circle", { r, fill: c, stroke: PAPER, "stroke-width": 3 }, g);
+      return { e, at(fn, u, op = 1) { set(e, { cx: X(u), cy: Y(fn(u)), opacity: op }); }, atXY(t, v, op = 1) { set(e, { cx: X(t), cy: Y(v), opacity: op }); } }; },
+    /** tangent line to fn at u (px half-length len) */
+    tangent(c, sw = 5) { const e = el("line", { stroke: c, "stroke-width": sw, "stroke-linecap": "round" }, g);
+      return { e, at(fn, u, len = 150, op = 1) {
+        const d = 1e-3, k = (fn(u + d) - fn(u - d)) / (2 * d), m = -(k * (h / (hi - lo))) / (w / T), n = Math.hypot(1, m), dx = len / n, dy = m * len / n, cx = X(u), cy = Y(fn(u));
+        set(e, { x1: cx - dx, y1: cy - dy, x2: cx + dx, y2: cy + dy, opacity: op });
+      } }; },
+    /** straight segment between two data points, drawn to progress p */
+    seg(c, { sw = 4, dash = null } = {}) { const e = el("line", { stroke: c, "stroke-width": sw, "stroke-linecap": "round" }, g); if (dash) e.setAttribute("stroke-dasharray", dash);
+      return { e, at(t1, v1, t2, v2, p = 1, op = 1) { if (op < 0.005 || p <= 0) { e.setAttribute("opacity", 0); return; }
+        set(e, { x1: X(t1), y1: Y(v1), x2: lerp(X(t1), X(t2), p), y2: lerp(Y(v1), Y(v2), p), opacity: op }); } }; },
+    /** KaTeX label placed at a data point (+ optional px offset) */
+    label(src, { size: sz = 34, color: c = INK } = {}) { const o = tex(g, src, { size: sz, color: c });
+      return { o, at(t, v, op = 1, { dx = 0, dy = 0, anchor = "c" } = {}) { o.at(X(t) + dx, Y(v) + dy, op, { anchor }); } }; },
+    note(txt, { size: sz = 40, color: c = INK, anchor = "start", weight = 600 } = {}) { const o = hand(g, txt, { size: sz, color: c, anchor, weight });
+      return { o, write(t, v, tt, t0, opt = {}) { const { dx = 0, dy = 0, ...r } = opt; o.write(X(t) + dx, Y(v) + dy, tt, t0, r); } }; },
+  };
+  return api;
+}
+
+/** three (or two) graphs sharing a time axis, stacked on the left of a panel */
+const GX = -880, GW = 720, GH = 230, GY3 = [-395, -120, 155];
+function stack(parent, T, specs, xticks) {
+  const ys = specs.length === 3 ? GY3 : specs.length === 2 ? [-380, -10] : [-330];
+  const hs = specs.length === 3 ? GH : specs.length === 2 ? 310 : 520;
+  return specs.map((s, i) => Graph(parent, { x: GX, y: ys[i], w: GW, h: hs, T, xticks, xtl: i === specs.length - 1, color: s.color, ...s }));
+}
+
+/* ---------------------------------------------------------- the cart / ball demos (motion representation) */
+function cart(parent, { w = 130, h = 62, body = "#d9e6f7", tag = "" } = {}) {
+  const g = el("g", {}, parent);
+  el("rect", { x: -w / 2, y: -h, width: w, height: h - 12, rx: 12, fill: body, stroke: INK, "stroke-width": 3 }, g);
+  for (const wx of [-w * 0.28, w * 0.28]) el("circle", { cx: wx, cy: -14, r: 14, fill: "#14233a", stroke: INK, "stroke-width": 3 }, g);
+  let tg = null; if (tag) { tg = el("text", { x: 0, y: -h / 2 - 2, "font-family": "Hand", "font-weight": 700, "font-size": 40, fill: "#14233a", "text-anchor": "middle" }, g); tg.textContent = tag; }
+  return { g, at(px, py, op = 1) { g.setAttribute("transform", `translate(${px},${py})`); g.setAttribute("opacity", op); } };
+}
+/** a track with one cart and velocity / (force|acceleration) arrows above it; returns update(s, v, a, op) */
+function demo(g, { x0 = 90, x1 = 700, y = -230, smin = 0, smax = 32, kv = 26, ka = 40, aCol = COL.a, aLab = "a", vLab = "v", tag = "", ticks = 4 } = {}) {
+  const tr = el("path", { d: `M${x0 - 30},${y}H${x1 + 30}`, stroke: MUTED, "stroke-width": 4, "stroke-linecap": "round" }, g);
+  let td = ""; for (let i = 0; i <= ticks; i++) { const px = x0 + (x1 - x0) * i / ticks; td += `M${px},${y}v14`; } el("path", { d: td, stroke: MUTED, "stroke-width": 3 }, g);
+  const cb = cart(g, { tag }), vA = arrow(g, COL.v, 6), aA = arrow(g, aCol, 6), vL = tex(g, vLab, { size: 34, color: COL.v }), aL = tex(g, aLab, { size: 34, color: aCol });
+  return (s, v, a, op = 1, showA = true) => {
+    const px = x0 + (clamp(s, smin, smax) - smin) / (smax - smin) * (x1 - x0);
+    cb.at(px, y, op);
+    vA.draw(px, y - 105, px + v * kv, y - 105, { op }); vL.at(px - 22, y - 124, Math.abs(v) * kv > 6 ? op : 0);
+    aA.draw(px, y - 150, px + a * ka, y - 150, { op: showA ? op : 0 }); aL.at(px - 22, y - 169, showA && Math.abs(a) * ka > 6 ? op : 0);
+    return px;
+  };
+}
+
+/** "ladder" of quantities: gradient arrows go down, area arrows go up */
+function ladder(g, { x, y0, dy, items, r = 46, size = 50, labels = true, lsize = 40 }) {
+  const nodes = items.map((it, i) => { const ng = el("g", {}, g); el("circle", { r, fill: "none", stroke: it.color, "stroke-width": 5 }, ng); const tx = tex(ng, it.tex, { size, color: it.color }); return { ng, tx, y: y0 + i * dy }; });
+  const downs = [], ups = [];
+  for (let i = 0; i < items.length - 1; i++) { downs.push(arrow(g, INK, 5)); ups.push(arrow(g, INK, 5)); }
+  const dl = hand(g, "gradient", { size: lsize, anchor: "end" }), ul = hand(g, "area", { size: lsize, anchor: "start" });
+  return (t, tShow, tDown, tUp) => {
+    const k = ap(t, tShow, 0.6);
+    nodes.forEach(n => { n.ng.setAttribute("transform", `translate(${x},${n.y})`); n.ng.setAttribute("opacity", k); n.tx.at(0, 0, 1); });
+    downs.forEach((a, i) => a.draw(x - 28, nodes[i].y + r + 10, x - 28, nodes[i + 1].y - r - 10, { p: ap(t, tDown + i * 0.35, 0.5), op: k }));
+    ups.forEach((a, i) => a.draw(x + 28, nodes[i + 1].y - r - 10, x + 28, nodes[i].y + r + 10, { p: ap(t, tUp + i * 0.35, 0.5), op: k }));
+    if (labels) { const my = (nodes[0].y + nodes[1].y) / 2 + 12; dl.write(x - 50, my, t, tDown, { op: k, speed: 0.03 }); ul.write(x + 50, my, t, tUp, { op: k, speed: 0.03 }); }
+  };
+}
+
+/* ========================================================== s01 — two moves */
+section("s01", (g, c, id) => {
+  const title = hand(g, "Reading motion & momentum graphs", { size: 124, anchor: "middle", weight: 700 });
+  const sub = hand(g, "IB Physics SL  ·  A.1 Kinematics  ·  A.2 Forces and momentum", { size: 54, anchor: "middle", color: MUTED });
+  const wG = hand(g, "gradient", { size: 130, anchor: "middle", color: COL.v, weight: 700 }), wA = hand(g, "area", { size: 130, anchor: "middle", color: COL.s, weight: 700 });
+  const zc = (col, cy, amp, f) => {
+    const e = el("path", { stroke: col, "stroke-width": 8, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }, g);
+    return (p, op) => {
+      if (p < 0.01 || op < 0.005) { e.setAttribute("opacity", 0); return; }
+      const m = Math.max(2, Math.ceil(p * 160)); let d = "";
+      for (let i = 0; i <= m; i++) { const x = i / 160; d += `${i ? "L" : "M"}${(-880 + 1760 * x).toFixed(1)},${(cy - amp * f(x)).toFixed(1)}`; }
+      e.setAttribute("d", d); e.setAttribute("opacity", op);
+    };
+  };
+  const zoo = [zc(COL.s, -330, 120, x => x * x), zc(COL.v, -190, 90, x => 0.7 * Math.sin(x * 9.4)), zc(COL.a, -50, 70, x => (x < 0.25 ? 0 : x < 0.5 ? 1 : x < 0.75 ? 0.3 : -0.6)),
+    zc(COL.F, 90, 120, x => Math.exp(-Math.pow((x - 0.35) / 0.06, 2))), zc(COL.p, 230, 120, x => 1 - Math.exp(-4 * x)), zc(COL.D, 360, 80, x => 1 - Math.abs(2 * ((x * 3) % 1) - 1))];
+  const T = 8;
+  const aF = t => (t < 3 ? 2 : t < 5 ? 0 : -2), vF = t => (t < 3 ? 2 * t : t < 5 ? 6 : 6 - 2 * (t - 5));
+  const sF = t => (t < 3 ? t * t : t < 5 ? 9 + 6 * (t - 3) : 21 + 6 * (t - 5) - (t - 5) * (t - 5));
+  const G = stack(g, T, [{ lo: 0, hi: 32, yticks: [10, 20, 30], ylab: "s\\,/\\,\\text{m}", color: COL.s }, { lo: 0, hi: 7.5, yticks: [2, 4, 6], ylab: "v\\,/\\,\\text{m s}^{-1}", color: COL.v },
+    { lo: -3, hi: 3, yticks: [-2, 0, 2], ylab: "a\\,/\\,\\text{m s}^{-2}", color: COL.a }], [2, 4, 6, 8]);
+  const fns = [sF, vF, aF], cols = [COL.s, COL.v, COL.a];
+  const P = G.map((gr, i) => gr.plot(fns[i], { color: cols[i] })), D = G.map((gr, i) => gr.dot(cols[i]));
+  const guide = el("line", { stroke: MUTED, "stroke-width": 2.5, "stroke-dasharray": "8 8" }, g);
+  const dem = demo(g, { smax: 32, kv: 28, ka: 45 });
+  const phase = hand(g, "", { size: 46, color: MUTED });
+  const L1 = ladder(g, { x: 330, y0: -40, dy: 175, items: [{ tex: "s", color: COL.s }, { tex: "v", color: COL.v }, { tex: "a", color: COL.a }] });
+  const L2 = ladder(g, { x: 720, y0: -40, dy: 175, items: [{ tex: "p", color: COL.p }, { tex: "F", color: COL.F }], labels: false });
+  const tl = hand(g, "", { size: 40, color: MUTED });
+  return t => {
+    const out = ap(t, c("Watch a cart") - 0.2, 0.8);
+    title.write(0, -90, t, 0.5, { speed: 0.035, op: 1 - out }); sub.write(0, 0, t, 2.4, { speed: 0.02, op: 1 - out });
+    wG.write(-420, 260, t, c("take the gradient"), { speed: 0.05, op: 1 - out }); wA.write(380, 260, t, c("take the area"), { speed: 0.05, op: 1 - out });
+    zoo.forEach((z, i) => z(ap(t, 0.2 + i * 0.7, 2.2), 0.4 * (1 - out)));
+    const tp = c("Watch a cart") + 0.7, u = clamp(t - tp, 0, T), fr = ap(t, tp - 0.7, 0.6), live = u > 0.05 && u < T - 0.05 ? 1 : 0;
+    G.forEach(gr => gr.show(fr));
+    P.forEach(p => p.set(u, fr)); D.forEach((d, i) => d.at(fns[i], u, fr * live));
+    const gx = GX + G[0].X(u); set(guide, { x1: gx, x2: gx, y1: GY3[0], y2: GY3[2] + GH, opacity: fr * live * 0.8 });
+    dem(sF(u), vF(u), aF(u), fr);
+    phase.write(90, -160, t, tp, { txt: u < 3 ? "speeding up: a > 0" : u < 5 ? "cruising: a = 0" : "braking: a < 0", speed: 0.001, op: fr * live });
+    const cg = c("Gradient takes you down the ladder"), ca = c("Area takes you back up"), cn = c("Then we'll use the same two moves");
+    L1(t, cg - 0.8, cg + 0.3, ca);
+    L2(t, cn, cn + 1.0, cn + 2.2);
+    tl.write(560, -120, t, cn + 0.3, { txt: "forces & momentum", speed: 0.03, op: ap(t, cn, 0.5) });
+  };
+});
+
+/* ========================================================== s02 — what gradient and area mean */
+section("s02", (g, c, id) => {
+  const H = heading(g, "②", "gradient and area", S(id));
+  const A = Graph(g, { x: -900, y: -330, w: 760, h: 440, T: 6, lo: 0, hi: 9, color: COL.s, ylab: "s\\,/\\,\\text{m}", yticks: [3, 6, 9], xticks: [2, 4, 6] });
+  const B = Graph(g, { x: 100, y: -330, w: 760, h: 440, T: 6, lo: 0, hi: 5, color: COL.v, ylab: "v\\,/\\,\\text{m s}^{-1}", yticks: [1, 2, 3, 4, 5], xticks: [2, 4, 6] });
+  const sA = A.plot(t => 1.5 * t, { color: COL.s }), sB = B.plot(() => 3, { color: COL.v });
+  const run = A.seg(INK, { dash: "10 9" }), rise = A.seg(INK, { dash: "10 9" });
+  const dT = A.label("\\Delta t", { color: INK }), dS = A.label("\\Delta s", { color: INK }), gl = A.label("\\text{gradient} = \\dfrac{\\Delta s}{\\Delta t}", { color: COL.s, size: 40 });
+  const rec = B.band(() => 3, { color: COL.s, op0: 0.4 });
+  const bv = B.label("v", { color: COL.v }), bt = B.label("t", { color: INK }), ar = B.label("\\text{area} = v \\times t", { color: COL.s, size: 40 });
+  const E1 = eqs(g, -900, 250, [
+    { tex: "\\dfrac{\\Delta s}{\\Delta t}\\;\\to\\;\\dfrac{\\text{m}}{\\text{s}} = \\text{m s}^{-1}", t: c("the gradient is metres per second"), size: 46 },
+    { tex: "\\Rightarrow\\ \\text{velocity}", t: c("That's velocity"), y: 380, final: true, ulw: 270, ulColor: COL.s },
+  ]);
+  const E2 = eqs(g, 100, 250, [
+    { tex: "v \\times t\\;\\to\\;\\text{m s}^{-1}\\times\\text{s} = \\text{m}", t: c("the area is metres per second"), size: 46 },
+    { tex: "\\Rightarrow\\ \\text{displacement}", t: c("so displacement"), y: 380, final: true, ulw: 340, ulColor: COL.s },
+  ]);
+  const rule = hand(g, "gradient = vertical ÷ horizontal      ·      area = vertical × horizontal", { size: 56, weight: 700 });
+  return t => {
+    H(t);
+    const fr = ap(t, S(id) + 0.6, 0.6); A.show(fr); B.show(fr);
+    const cr = c("rise over run"), ca = c("The area is the vertical quantity");
+    sA.set(ap(t, cr - 0.3, 1.0) * 6, fr); sB.set(ap(t, ca - 0.3, 1.0) * 6, fr);
+    run.at(1.5, 2.25, 4.5, 2.25, ap(t, cr + 0.8, 0.6)); rise.at(4.5, 2.25, 4.5, 6.75, ap(t, cr + 1.5, 0.6));
+    dT.at(3, 2.25, ap(t, cr + 1.3, 0.4), { dy: 36 }); dS.at(4.5, 4.5, ap(t, cr + 2.0, 0.4), { dx: 44 });
+    gl.at(0.4, 7.9, ap(t, cr + 2.4, 0.5), { anchor: "l" });
+    rec.set(0, 4 * ap(t, ca + 0.6, 1.2), 1);
+    bv.at(0, 1.5, ap(t, ca + 1.4, 0.4), { dx: -26 }); bt.at(2, 0, ap(t, ca + 1.6, 0.4), { dy: -26 });
+    ar.at(0.35, 4.6, ap(t, ca + 2.2, 0.5), { anchor: "l" });
+    E1(t); E2(t);
+    rule.write(-900, 500, t, c("what are the axes"), { speed: 0.02 });
+  };
+});
+
+/* ========================================================== s03 — constant velocity */
+section("s03", (g, c, id) => {
+  const H = heading(g, "③", "constant velocity", S(id));
+  const T = 8;
+  const vF = t => (t < 2 ? 3 : t < 4 ? 1.5 : t < 5.5 ? 0 : -2), sF = t => (t < 2 ? 3 * t : t < 4 ? 6 + 1.5 * (t - 2) : t < 5.5 ? 9 : 9 - 2 * (t - 5.5)), aF = () => 0;
+  const G = stack(g, T, [{ lo: 0, hi: 10.5, yticks: [3, 6, 9], ylab: "s\\,/\\,\\text{m}", color: COL.s }, { lo: -3, hi: 4, yticks: [-2, 2], ylab: "v\\,/\\,\\text{m s}^{-1}", color: COL.v },
+    { lo: -1, hi: 1, yticks: [0], ylab: "a\\,/\\,\\text{m s}^{-2}", color: COL.a }], [2, 4, 6, 8]);
+  const ps = G[0].plot(sF, { color: COL.s }), pv = G[1].plot(vF, { color: COL.v }), pa = G[2].plot(aF, { color: COL.a });
+  const ds = G[0].dot(COL.s);
+  const bP = G[1].band(vF, { color: COL.s, op0: 0.4, part: "pos" }), bN = G[1].band(vF, { color: BAND_NEG, op0: 0.4, part: "neg" });
+  const labs = [["v = 3", 1, 3, 90, 30], ["v = 1.5", 3, 7.5, -20, -48], ["v = 0", 4.75, 9, 0, -46], ["v = -2", 6.75, 6.5, 70, -34]].map(([s, t, v, dx, dy]) => ({ l: G[0].label(s, { color: COL.v, size: 36 }), t, v, dx, dy }));
+  const dem = demo(g, { smax: 10, kv: 38, ticks: 5 });
+  const E = eqs(g, 60, -60, [
+    { tex: "v = \\dfrac{\\Delta s}{\\Delta t}", t: c("its gradient is the velocity"), final: true, uly: 72, ulw: 230, ulColor: COL.v, size: 50 },
+    { tex: "\\Delta s = v\\,\\Delta t", t: c("The area under it"), y: 110, final: true, ulw: 250, ulColor: COL.s },
+    { tex: "a = 0", t: c("sits on zero"), y: 230 },
+  ]);
+  const cA = c("straight line"), cB = c("A steeper line"), cC = c("Flat means stationary"), cD = c("sloping down"), cU = c("Underneath");
+  const uM = lin([[cA, 0], [cB + 0.8, 2], [cC - 0.1, 4], [cD - 0.5, 5.5], [cU - 0.3, 8]]);
+  const sweep = lin([[cU + 0.2, 0], [cU + 3.2, 8]]);
+  return t => {
+    H(t);
+    const f1 = ap(t, S(id) + 0.6, 0.6), u = clamp(uM(t), 0, T); G[0].show(f1);
+    ps.set(u, f1); ds.at(sF, u, f1 * (u > 0.05 ? 1 : 0));
+    const f2 = ap(t, cU - 0.4, 0.6), us = clamp(sweep(t), 0, T); G[1].show(f2); G[2].show(f2);
+    pv.set(us, f2); pa.set(us, f2);
+    labs.forEach(l => l.l.at(l.t, l.v, smooth(l.t - 0.2, l.t + 0.15, u) * f1, { dx: l.dx, dy: l.dy }));
+    const ar = c("The area under it"), p = lin([[ar, 0], [ar + 2.8, 8]])(t);
+    bP.set(0, p, 1); bN.set(0, p, 1);
+    dem(sF(u), vF(u), 0, f1, false);
+    E(t);
+  };
+});
+
+/* ========================================================== s04 — constant acceleration */
+section("s04", (g, c, id) => {
+  const H = heading(g, "④", "constant acceleration", S(id));
+  const T = 6, u0 = 2, a0 = 1;
+  const sF = t => u0 * t + 0.5 * a0 * t * t, vF = t => u0 + a0 * t, aF = () => a0;
+  const G = stack(g, T, [{ lo: 0, hi: 33, yticks: [10, 20, 30], ylab: "s\\,/\\,\\text{m}", color: COL.s }, { lo: 0, hi: 9.5, yticks: [2, 4, 6, 8], ylab: "v\\,/\\,\\text{m s}^{-1}", color: COL.v },
+    { lo: 0, hi: 2, yticks: [1], ylab: "a\\,/\\,\\text{m s}^{-2}", color: COL.a }], [2, 4, 6]);
+  const pS = G[0].plot(sF, { color: COL.s }), pV = G[1].plot(vF, { color: COL.v }), pA = G[2].plot(aF, { color: COL.a });
+  const dS = G[0].dot(COL.s), dV = G[1].dot(COL.v), dA = G[2].dot(COL.a);
+  const areaA = G[2].band(aF, { color: COL.v, op0: 0.4 }), dvL = G[2].label("\\Delta v = a\\,t", { color: COL.v, size: 36 });
+  const run = G[1].seg(INK, { dash: "10 9" }), rise = G[1].seg(INK, { dash: "10 9" }), dTL = G[1].label("\\Delta t"), dVL = G[1].label("\\Delta v");
+  const tg = G[0].tangent(COL.v, 6), dp = G[1].dot(COL.v, 13), dps = G[0].dot(INK, 10);
+  const guide = el("line", { stroke: MUTED, "stroke-width": 2.5, "stroke-dasharray": "8 8" }, g);
+  const dem = demo(g, { smax: 33, kv: 36, ka: 60 });
+  const read = hand(g, "", { size: 50, color: COL.v, weight: 700 });
+  const E1 = eqs(g, 60, -60, [
+    { tex: "a = \\dfrac{\\Delta v}{\\Delta t}", t: c("Its gradient is the acceleration"), final: true, uly: 72, ulw: 220, ulColor: COL.a, size: 50 },
+    { tex: "\\Delta v = a\\,\\Delta t", t: c("the area under it"), y: 110, final: true, ulw: 260, ulColor: COL.v },
+    { tex: "\\text{m s}^{-2}\\times\\text{s} = \\text{m s}^{-1}", t: c("Check it with the units"), y: 260, size: 44 },
+  ]);
+  const p1 = c("flat line"), p2 = c("That makes the velocity-time graph"), p3 = c("And on the displacement-time graph"), cT = c("At every moment");
+  const ps = t0 => t => clamp((t - t0) / 5.2, 0, 1) * T;
+  const u1 = ps(p1 + 0.2), u2 = ps(p2 + 0.4), u3 = ps(p3 + 0.2), probe = lin([[cT + 0.2, 0.4], [cT + 6.2, 5.6]]);
+  return t => {
+    H(t);
+    const f1 = ap(t, p1 - 0.5, 0.5), f2 = ap(t, p2 - 0.3, 0.5), f3 = ap(t, p3 - 0.3, 0.5);
+    G[2].show(f1); G[1].show(f2); G[0].show(f3);
+    const a = u1(t), v = u2(t), s = u3(t);
+    pA.set(a, f1); dA.at(aF, a, f1 * (a > 0.05 && a < T - 0.05 ? 1 : 0));
+    pV.set(v, f2); dV.at(vF, v, f2 * (v > 0.05 && v < T - 0.05 ? 1 : 0));
+    pS.set(s, f3); dS.at(sF, s, f3 * (s > 0.05 && s < T - 0.05 ? 1 : 0));
+    const cu = t < p2 ? a : t < p3 ? v : s, op = ap(t, p1 - 0.4, 0.5);
+    dem(sF(cu), vF(cu), a0, op);
+    const ca = c("the area under it"); areaA.set(0, T * ap(t, ca, 1.4), 1); dvL.at(3, 0.5, ap(t, ca + 1.0, 0.5));
+    const cg = c("Its gradient is the acceleration");
+    run.at(1, 3, 5, 3, ap(t, cg + 0.4, 0.5), f2); rise.at(5, 3, 5, 7, ap(t, cg + 1.0, 0.5), f2); dTL.at(3, 3, ap(t, cg + 0.9, 0.4), { dy: 34 }); dVL.at(5, 5, ap(t, cg + 1.5, 0.4), { dx: 46 });
+    // tangent probe
+    const pr = probe(t), kp = ap(t, cT, 0.5) * (t > cT + 6.4 ? 1 - ap(t, cT + 6.4, 0.5) : 1);
+    tg.at(sF, pr, 170, kp); dps.at(sF, pr, kp); dp.at(vF, pr, kp);
+    const gx = GX + G[0].X(pr); set(guide, { x1: gx, x2: gx, y1: GY3[0] + G[0].Y(sF(pr)), y2: GY3[1] + G[1].Y(vF(pr)), opacity: kp * 0.9 });
+    read.write(60, 400, t, cT, { txt: `slope of s–t = ${fmt(vF(pr), 1)} m/s   =   height of v–t`, speed: 0.001, op: kp });
+    E1(t);
+  };
+});
+
+/* ========================================================== s05 — the equations from one graph */
+section("s05", (g, c, id) => {
+  const H = heading(g, "⑤", "the equations from one graph", S(id));
+  const P = Graph(g, { x: -900, y: -340, w: 800, h: 640, T: 6.6, lo: 0, hi: 9.6, color: COL.v, ylab: "v\\,/\\,\\text{m s}^{-1}", yticks: [2, 4, 6, 8], xticks: [2, 4, 6] });
+  const vF = t => 2 + t;
+  const ln = P.plot(vF, { color: COL.v, to: 6, w: 8 });
+  const rect = P.band(() => 2, { color: COL.s, op0: 0.38 }), tri = P.band(vF, { color: COL.G, op0: 0.4, bot: () => 2 });
+  const lu = P.label("u", { color: COL.v, size: 42 }), lv = P.label("v", { color: COL.v, size: 42 }), lt = P.label("t", { color: INK, size: 42 }), lat = P.label("a t", { color: COL.a, size: 40 });
+  const brace = P.seg(COL.a, { sw: 5 }), bt1 = P.seg(COL.a, { sw: 5 }), bt2 = P.seg(COL.a, { sw: 5 });
+  const run = P.seg(INK, { dash: "10 9" }), rise = P.seg(INK, { dash: "10 9" }), dT = P.label("\\Delta t"), dV = P.label("\\Delta v");
+  const lr = P.label("u\\,t", { color: INK, size: 40 }), ltr = P.label("\\tfrac12\\,t\\,(a t)", { color: INK, size: 40 });
+  const trapE = el("path", { fill: "none", stroke: INK, "stroke-width": 5, "stroke-linejoin": "round" }, P.g);
+  trapE.setAttribute("d", `M${P.X(0)},${P.Y(0)}L${P.X(0)},${P.Y(2)}L${P.X(6)},${P.Y(8)}L${P.X(6)},${P.Y(0)}Z`);
+  const E1 = eqs(g, 70, -300, [
+    { tex: "a = \\dfrac{v - u}{t}", t: c("The gradient is the acceleration"), y: -310, size: 44 },
+    { tex: "v = u + a t", t: c("Rearrange it"), y: -215, final: true, ulw: 250, ulColor: COL.v },
+    { tex: "\\text{rectangle} = u\\,t", t: c("The rectangle is"), y: -110, size: 44 },
+    { tex: "\\text{triangle} = \\tfrac12\\,t\\,(a t)", t: c("The triangle is"), y: -15, size: 44 },
+    { tex: "s = u t + \\tfrac12 a t^2", t: c("Add them"), y: 90, final: true, ulw: 360, ulColor: COL.s },
+    { tex: "s = \\tfrac12 (u + v)\\,t", t: c("one trapezoid"), y: 195, final: true, ulw: 330, ulColor: COL.s },
+    { tex: "t = \\dfrac{v-u}{a}\\;\\Rightarrow\\; v^2 = u^2 + 2 a s", t: c("eliminate the time"), y: 305, final: true, ulw: 560, ulColor: COL.s, size: 44 },
+  ]);
+  return t => {
+    H(t);
+    const fr = ap(t, S(id) + 0.5, 0.6); P.show(fr);
+    ln.set(ap(t, S(id) + 0.7, 1.4) * 6, fr);
+    const cs = c("Start at the initial velocity");
+    lu.at(0, 2, ap(t, cs, 0.4), { dx: -66 }); lv.at(6, 8, ap(t, cs + 1.4, 0.4), { dy: -34 }); lt.at(6, 0, ap(t, cs + 2.6, 0.4), { dy: -30 });
+    const cg = c("The gradient is the acceleration");
+    run.at(1, 3, 4, 3, ap(t, cg + 0.2, 0.5)); rise.at(4, 3, 4, 6, ap(t, cg + 0.8, 0.5)); dT.at(2.5, 3, ap(t, cg + 0.7, 0.4), { dy: 34 }); dV.at(4, 4.5, ap(t, cg + 1.3, 0.4), { dx: 44 });
+    const fadeG = 1 - ap(t, c("Now the displacement"), 0.5);
+    run.e.setAttribute("opacity", ap(t, cg + 0.2, 0.5) * fadeG); rise.e.setAttribute("opacity", ap(t, cg + 0.8, 0.5) * fadeG);
+    dT.o.g.setAttribute("opacity", ap(t, cg + 0.7, 0.4) * fadeG); dV.o.g.setAttribute("opacity", ap(t, cg + 1.3, 0.4) * fadeG);
+    const cr = c("The rectangle is"), ct = c("The triangle is");
+    const cz = c("one trapezoid"), z = ap(t, cz, 0.7);
+    rect.set(0, 6 * ap(t, c("Split it into a rectangle"), 1.0), 1); tri.set(0, 6 * ap(t, c("Split it into a rectangle") + 0.8, 1.0), 1, z > 0.5 ? COL.s : COL.G);
+    trapE.setAttribute("opacity", z * fr);
+    lr.at(3, 1, ap(t, cr, 0.4)); ltr.at(3.3, 4.6, ap(t, ct, 0.4));
+    lat.at(6.55, 5, ap(t, ct, 0.4), { dx: 22, anchor: "l" }); brace.at(6.3, 2, 6.3, 8, ap(t, ct, 0.5)); bt1.at(6.2, 2, 6.4, 2, ap(t, ct, 0.5)); bt2.at(6.2, 8, 6.4, 8, ap(t, ct, 0.5));
+    E1(t);
+  };
+});
+
+/* ========================================================== s06 — average vs instantaneous velocity */
+section("s06", (g, c, id) => {
+  const H = heading(g, "⑥", "average and instantaneous velocity", S(id));
+  const sF = t => 2 * t + 0.5 * t * t, tA = 2, sA = sF(tA), CH = "#9ad1ff";
+  const P = Graph(g, { x: -900, y: -370, w: 900, h: 640, T: 6, lo: 0, hi: 33, color: COL.s, ylab: "s\\,/\\,\\text{m}", yticks: [10, 20, 30], xticks: [1, 2, 3, 4, 5, 6] });
+  const curve = P.plot(sF, { color: COL.s, w: 8 });
+  const dA = P.dot(INK, 13), dB = P.dot(CH, 13);
+  const chord = P.seg(CH, { sw: 5 }), run = P.seg(MUTED, { dash: "10 9" }), rise = P.seg(MUTED, { dash: "10 9" });
+  const dT = P.label("\\Delta t", { color: CH }), dS = P.label("\\Delta s", { color: CH });
+  const tg = P.tangent(COL.v, 6);
+  const m1 = P.dot(BAND_NEG, 11), m2 = P.dot(BAND_NEG, 11);
+  const tRun = P.seg(COL.v, { dash: "10 9" }), tRise = P.seg(COL.v, { dash: "10 9" });
+  const l1 = hand(g, "chord  →  average velocity", { size: 54, color: CH, weight: 700 }), l2 = hand(g, "tangent  →  instantaneous velocity", { size: 54, color: COL.v, weight: 700 });
+  const rd = hand(g, "", { size: 54, weight: 700 }), l3 = hand(g, "✗  two points on the curve  →  an average", { size: 50, color: BAND_NEG, weight: 700 });
+  const l4 = hand(g, "✓  two points on the tangent  →  instantaneous", { size: 50, color: COL.G, weight: 700 });
+  const cJ = c("join them"), cS = c("Now slide one point"), cTg = c("becomes the tangent"), cM = c("A common mistake"), cU = c("use two points on the tangent line");
+  const tBf = t => lerp(5.5, 2.12, ease(clamp((t - cS - 0.2) / 5.2, 0, 1)));
+  return t => {
+    H(t);
+    const fr = ap(t, S(id) + 0.4, 0.5); P.show(fr);
+    curve.set(ap(t, S(id) + 0.5, 1.6) * 6, fr);
+    const kA = ap(t, c("Pick two points"), 0.4), kB = ap(t, c("Pick two points") + 0.7, 0.4);
+    dA.atXY(tA, sA, kA); const tB = tBf(t), sB = sF(tB); dB.atXY(tB, sB, kB);
+    const mC = (sB - sA) / (tB - tA), toTan = ap(t, cTg, 0.7);
+    const kc = ap(t, cJ, 0.6) * (1 - toTan);
+    const t1 = Math.max(0.05, tA - Math.min(1.4, 0.96 * sA / mC)), t2 = Math.min(6, tB + 0.5);
+    chord.at(t1, sA + mC * (t1 - tA), t2, sA + mC * (t2 - tA), ap(t, cJ, 0.6), kc);
+    const kr = ap(t, cJ + 0.9, 0.5) * (1 - toTan);
+    run.at(tA, sA, tB, sA, 1, kr); rise.at(tB, sA, tB, sB, 1, kr);
+    dT.at((tA + tB) / 2, sA, kr, { dy: 34 }); dS.at(tB, (sA + sB) / 2, kr * (tB - tA > 0.7 ? 1 : 0), { dx: 40 });
+    tg.at(sF, tA, 230, toTan);
+    const cV = c("average velocity");
+    l1.write(60, -250, t, cV, { speed: 0.025 }); l2.write(60, -150, t, c("instantaneous velocity"), { speed: 0.025 });
+    rd.write(60, -30, t, cJ, { txt: t < cTg - 0.2 ? `chord gradient = ${fmt(mC, 1)} m/s` : `tangent gradient = ${fmt(2 + tA, 1)} m/s`, speed: 0.001, op: ap(t, cJ, 0.5), });
+    rd.e.setAttribute("fill", t < cTg - 0.2 ? CH : COL.v);
+    // the common mistake
+    const km = ap(t, cM, 0.5), ku = ap(t, cU, 0.8);
+    const q1 = [1.0, sF(1.0)], q2 = [4.2, sF(4.2)], r1 = [0.6, sA + 4 * (0.6 - tA)], r2 = [4.2, sA + 4 * (4.2 - tA)];
+    const mx = [lerp(q1[0], r1[0], ease(ku)), lerp(q1[1], r1[1], ease(ku))], my = [lerp(q2[0], r2[0], ease(ku)), lerp(q2[1], r2[1], ease(ku))];
+    const mop = km * (1 - ap(t, E(id) - 1.0, 0.8));
+    m1.atXY(mx[0], mx[1], mop); m2.atXY(my[0], my[1], mop);
+    m1.e.setAttribute("fill", ku > 0.5 ? COL.G : BAND_NEG); m2.e.setAttribute("fill", ku > 0.5 ? COL.G : BAND_NEG);
+    tRun.at(r1[0], r1[1], r2[0], r1[1], ku, mop * ku); tRise.at(r2[0], r1[1], r2[0], r2[1], ku, mop * ku);
+    l3.write(60, 120, t, cM, { speed: 0.02 }); l4.write(60, 210, t, cU, { speed: 0.02 });
+  };
+});
+
+/* ========================================================== s07 — a ball thrown up */
+section("s07", (g, c, id) => {
+  const H = heading(g, "⑦", "a ball thrown up: signs, displacement and distance", S(id));
+  const T = 4, U = 19.62, g0 = 9.81;
+  const sF = t => U * t - 0.5 * g0 * t * t, vF = t => U - g0 * t, aF = () => -g0;
+  const G = stack(g, T, [{ lo: -2, hi: 23, yticks: [10, 20], ylab: "s\\,/\\,\\text{m}", color: COL.s }, { lo: -22, hi: 22, yticks: [-20, 20], ylab: "v\\,/\\,\\text{m s}^{-1}", color: COL.v },
+    { lo: -12, hi: 3, yticks: [-9.81], ylab: "a\\,/\\,\\text{m s}^{-2}", color: COL.a }], [1, 2, 3, 4]);
+  const pS = G[0].plot(sF, { color: COL.s }), pV = G[1].plot(vF, { color: COL.v }), pA = G[2].plot(aF, { color: COL.a });
+  const dS = G[0].dot(COL.s), dV = G[1].dot(COL.v), dA = G[2].dot(COL.a);
+  const bP = G[1].band(vF, { color: COL.s, op0: 0.45, part: "pos" }), bN = G[1].band(vF, { color: BAND_NEG, op0: 0.45, part: "neg" });
+  const lP = G[1].label("+19.6\\ \\text{m}", { color: COL.s, size: 36 }), lN = G[1].label("-19.6\\ \\text{m}", { color: BAND_NEG, size: 36 });
+  const tg = G[0].tangent(COL.v, 6), lv0 = G[1].label("v = 0", { size: 34 }), la0 = G[2].label("a = -9.81", { color: COL.a, size: 34 });
+  const guide = el("line", { stroke: MUTED, "stroke-width": 2.5, "stroke-dasharray": "8 8" }, g);
+  // the ball (vertical track on the right)
+  const bx = 850, gy = 340, ball = el("circle", { r: 30, fill: "#d9e6f7", stroke: INK, "stroke-width": 3 }, g);
+  el("path", { d: `M780,${gy + 30}H920`, stroke: MUTED, "stroke-width": 5, "stroke-linecap": "round" }, g);
+  const vA = arrow(g, COL.v, 6), aA = arrow(g, COL.a, 6), vL = tex(g, "v", { size: 34, color: COL.v }), aL = tex(g, "a", { size: 34, color: COL.a });
+  const E1 = eqs(g, 20, -300, [
+    { tex: "a = \\dfrac{-19.6 - 19.6}{4.0} = -9.81\\ \\text{m s}^{-2}", t: c("Its gradient is minus"), size: 36 },
+    { tex: "\\Delta s = (+19.6) + (-19.6) = 0", t: c("displacement is zero"), y: -130, size: 38, final: true, ulw: 470, ulColor: COL.s },
+    { tex: "\\text{distance} = 19.6 + 19.6 = 39.2\\ \\text{m}", t: c("the distance travelled"), y: -20, size: 38, final: true, ulw: 560, ulColor: COL.s },
+  ]);
+  const cv = c("The velocity starts positive"), uM = lin([[cv, 0], [cv + 6, 4]]);
+  return t => {
+    H(t);
+    const fr = ap(t, S(id) + 0.5, 0.6); G.forEach(gr => gr.show(fr));
+    const u = clamp(uM(t), 0, T), live = u > 0.03 && u < T - 0.03 ? 1 : 0;
+    pS.set(u, fr); pV.set(u, fr); pA.set(u, fr); dS.at(sF, u, fr * live); dV.at(vF, u, fr * live); dA.at(aF, u, fr * live);
+    const by = gy - 16 * sF(u);
+    set(ball, { cx: bx, cy: by, opacity: fr });
+    vA.draw(bx - 80, by, bx - 80, by - vF(u) * 4.2, { op: fr }); vL.at(bx - 118, by - 8, Math.abs(vF(u)) * 4.2 > 8 ? fr : 0);
+    aA.draw(bx - 150, by, bx - 150, by + 9.81 * 4.2, { op: fr * (u > 0.02 ? 1 : 0) }); aL.at(bx - 188, by + 24, u > 0.02 ? fr : 0);
+    const ct = c("even at the top"), kt = ap(t, ct, 0.5);
+    const gx = GX + G[0].X(2); set(guide, { x1: gx, x2: gx, y1: GY3[0], y2: GY3[2] + GH, opacity: kt * 0.9 });
+    lv0.at(2, 0, kt, { dx: 62, dy: -26 }); la0.at(2, -9.81, kt, { dx: 160, dy: -34 });
+    tg.at(sF, 2, 150, ap(t, c("flattens at the top"), 0.5));
+    bP.set(0, 4 * ap(t, c("The area above the axis"), 1.2), 1); lP.at(0.65, 5, ap(t, c("The area above the axis") + 0.8, 0.5));
+    bN.set(0, 4 * ap(t, c("The area below"), 1.2), 1); lN.at(3.35, -5, ap(t, c("The area below") + 0.8, 0.5));
+    E1(t);
+  };
+});
+
+/* ========================================================== s08 — non-uniform acceleration, terminal velocity */
+section("s08", (g, c, id) => {
+  const H = heading(g, "⑧", "non-uniform acceleration", S(id));
+  const T = 10, vt = 20, g0 = 9.81, tau = vt / g0;
+  const vF = t => vt * (1 - Math.exp(-t / tau)), aF = t => g0 * Math.exp(-t / tau), sF = t => vt * (t - tau * (1 - Math.exp(-t / tau)));
+  const G = stack(g, T, [{ lo: 0, hi: 170, yticks: [50, 100, 150], ylab: "s\\,/\\,\\text{m}", color: COL.s }, { lo: 0, hi: 24, yticks: [10, 20], ylab: "v\\,/\\,\\text{m s}^{-1}", color: COL.v },
+    { lo: 0, hi: 11, yticks: [5, 10], ylab: "a\\,/\\,\\text{m s}^{-2}", color: COL.a }], [2, 4, 6, 8, 10]);
+  const pS = G[0].plot(sF, { color: COL.s }), pV = G[1].plot(vF, { color: COL.v }), pA = G[2].plot(aF, { color: COL.a });
+  const dS = G[0].dot(COL.s), dV = G[1].dot(COL.v), dA = G[2].dot(COL.a);
+  const asym = G[1].seg(MUTED, { dash: "10 9" }), asymL = G[1].note("terminal velocity", { size: 34, color: MUTED });
+  const bandV = G[1].band(vF, { color: COL.s, op0: 0.32 });
+  const sq = el("path", { stroke: INK, "stroke-width": 2, fill: "none" }, G[1].g);
+  let sd = ""; for (let t = 1; t < 10; t++) sd += `M${G[1].X(t)},${G[1].Y(0)}V${G[1].Y(24)}`; for (const v of [5, 10, 15, 20]) sd += `M0,${G[1].Y(v)}H${G[1].w}`; sq.setAttribute("d", sd);
+  const tgV = G[1].tangent(COL.a, 5), dP = G[1].dot(COL.a, 11), dPa = G[2].dot(COL.a, 13);
+  const tail = G[0].plot(sF, { color: INK, w: 13, from: 6, to: 10 });
+  const guide = el("line", { stroke: MUTED, "stroke-width": 2.5, "stroke-dasharray": "8 8" }, g);
+  // the falling ball in oil
+  const tube = el("rect", { x: 720, y: -390, width: 170, height: 790, rx: 18, fill: "#1b3a4f", stroke: INK, "stroke-width": 5 }, g);
+  const ball = el("circle", { r: 26, fill: "#d9e6f7", stroke: INK, "stroke-width": 3 }, g);
+  const Wd = arrow(g, COL.W, 7), Dd = arrow(g, COL.D, 7), WL = tex(g, "mg", { size: 34, color: COL.W }), DL = tex(g, "F_d", { size: 34, color: COL.D });
+  const note = (txt, col) => hand(g, txt, { size: 48, color: col, weight: 700 });
+  const n1 = note("a ≈ 9.81 at first", COL.a), n2 = note("faster  →  more drag", COL.D), n3 = note("less net force  →  smaller a", COL.a), n4 = note("terminal: a = 0  but  v ≠ 0", COL.v), n5 = note("constant-a equations ✗", BAND_NEG), n6 = note("area: count the squares", COL.s);
+  const cD = c("Drop a ball into oil"), uM = lin([[cD, 0], [cD + 10.5, 10]]), cT = c("acceleration is still the gradient");
+  const probe = lin([[cT, 0.3], [cT + 6.5, 9]]);
+  return t => {
+    H(t);
+    const fr = ap(t, S(id) + 0.5, 0.6); G.forEach(gr => gr.show(fr));
+    const u = clamp(uM(t), 0, T), live = u > 0.03 && u < T - 0.03 ? 1 : 0;
+    pS.set(u, fr); pV.set(u, fr); pA.set(u, fr); dS.at(sF, u, fr * live); dV.at(vF, u, fr * live); dA.at(aF, u, fr * live);
+    const by = -350 + 3.6 * sF(u), k = vF(u) / vt;
+    set(ball, { cx: 805, cy: by, opacity: fr });
+    Wd.draw(770, by, 770, by + 110, { op: fr }); WL.at(752, by + 135, fr); Dd.draw(840, by, 840, by - 110 * k, { op: fr * (110 * k > 4 ? 1 : 0) }); DL.at(866, by - 110 * k - 22, fr * (k > 0.25 && by - 110 * k > -370 ? 1 : 0));
+    const cl = c("levels off"); asym.at(0, 20, 10, 20, ap(t, cl, 0.8)); asymL.write(5.2, 20, t, cl + 0.3, { dy: -16, speed: 0.02 });
+    bandV.set(0, 10 * ap(t, c("Displacement is still the area"), 2.0), 1);
+    const cq = c("counting squares"); sq.setAttribute("opacity", 0.38 * ap(t, cq - 0.3, 0.5) * (1 - ap(t, cq + 3.5, 0.6)));
+    const kp = ap(t, cT, 0.5) * (1 - ap(t, cT + 7.2, 0.5)), pr = probe(t);
+    tgV.at(vF, pr, 190, kp); dP.at(vF, pr, kp); dPa.at(aF, pr, kp);
+    set(guide, { x1: GX + G[1].X(pr), x2: GX + G[1].X(pr), y1: GY3[1] + G[1].Y(vF(pr)), y2: GY3[2] + G[2].Y(aF(pr)), opacity: kp * 0.9 });
+    tail.set(10, ap(t, c("ends up a straight line"), 0.8) * (1 - ap(t, E(id) - 0.8, 0.8)));
+    n1.write(40, -330, t, c("At first the acceleration"), { speed: 0.03 }); n2.write(40, -240, t, c("the drag grows"), { speed: 0.03 }); n3.write(40, -150, t, c("so the acceleration shrinks"), { speed: 0.03 });
+    n4.write(40, -20, t, c("Zero acceleration does not mean"), { speed: 0.03 }); n5.write(40, 150, t, c("no longer apply"), { speed: 0.03 }); n6.write(40, 250, t, cq, { speed: 0.03 });
+  };
+});
+
+/* ========================================================== s09 — projectile motion */
+section("s09", (g, c, id) => {
+  const H = heading(g, "⑨", "projectile motion", S(id));
+  const T = 3, ux = 10, uy = 14.715, g0 = 9.81;
+  const xF = t => ux * t, yF = t => uy * t - 0.5 * g0 * t * t, vxF = () => ux, vyF = t => uy - g0 * t;
+  const mk = (x, y, lo, hi, yt, ylab, col, xtl) => Graph(g, { x, y, w: 360, h: 270, T, lo, hi, color: col, ylab, yticks: yt, xticks: [1, 2, 3], xtl });
+  const GA = mk(-900, -340, 0, 32, [10, 20, 30], "x\\,/\\,\\text{m}", COL.s, false), GB = mk(-900, 10, 0, 12.5, [5, 10], "v_x\\,/\\,\\text{m s}^{-1}", COL.v, true);
+  const GC = mk(-430, -340, 0, 12.5, [5, 10], "y\\,/\\,\\text{m}", COL.s, false), GD = mk(-430, 10, -17, 17, [-10, 10], "v_y\\,/\\,\\text{m s}^{-1}", COL.v, true);
+  const GR = [GA, GB, GC, GD], FN = [xF, vxF, yF, vyF], CO = [COL.s, COL.v, COL.s, COL.v];
+  const P = GR.map((gr, i) => gr.plot(FN[i], { color: CO[i] })), D = GR.map((gr, i) => gr.dot(CO[i]));
+  const GL = GR.map(() => el("line", { stroke: MUTED, "stroke-width": 2.5, "stroke-dasharray": "7 7" }, g));
+  const frame = (x, col) => el("rect", { x, y: -405, width: 440, height: 760, rx: 24, fill: "none", stroke: col, "stroke-width": 4, "stroke-dasharray": "14 10" }, g);
+  const r1 = frame(-960, COL.v), r2 = frame(-490, COL.s);
+  const c1 = hand(g, "horizontal: no force", { size: 42, color: COL.v, weight: 700 }), c2 = hand(g, "vertical: gravity only", { size: 40, color: COL.s, weight: 700 });
+  // trajectory
+  const X0 = 80, gy = 340, kx = 27, ky = 28;
+  el("path", { d: `M${X0 - 20},${gy}H${X0 + 840}`, stroke: MUTED, "stroke-width": 5, "stroke-linecap": "round" }, g);
+  const trail = el("path", { stroke: MUTED, "stroke-width": 3, fill: "none", "stroke-dasharray": "3 10", "stroke-linecap": "round" }, g);
+  const ball = el("circle", { r: 22, fill: "#d9e6f7", stroke: INK, "stroke-width": 3 }, g), gh = el("circle", { r: 22, fill: "none", stroke: INK, "stroke-width": 3, "stroke-dasharray": "6 6" }, g);
+  const aX = arrow(g, COL.v, 6), aY = arrow(g, COL.v, 6), gX = arrow(g, COL.v, 6);
+  const tvx = tex(g, "v_x = 10", { size: 36, color: COL.v }), tvy = tex(g, "v_y = 0", { size: 36, color: COL.v });
+  const cP = c("A projectile is two motions at once"), uM = lin([[cP + 1.0, 0], [cP + 8.0, 3]]), cTop = c("At the top"), cTime = c("Time is the only thing");
+  const mkA = GD.dot(COL.W, 13), mkB = GB.dot(COL.W, 13);
+  return t => {
+    H(t);
+    const fr = ap(t, S(id) + 0.5, 0.6); GR.forEach(gr => gr.show(fr));
+    const u = clamp(uM(t), 0, T), live = u > 0.03 && u < T - 0.03 ? 1 : 0;
+    GR.forEach((gr, i) => { P[i].set(u, fr); D[i].at(FN[i], u, fr * live); const gx = GX === -880 ? 0 : 0; });
+    const gxs = [-900, -900, -430, -430];
+    GL.forEach((l, i) => { const gr = GR[i], x = gxs[i] + gr.X(u), y0 = [-340, 10, -340, 10][i]; set(l, { x1: x, x2: x, y1: y0, y2: y0 + 270, opacity: fr * live * (t > cTime ? 1 : 0.7), "stroke-width": t > cTime ? 4.5 : 2.5, stroke: t > cTime ? INK : MUTED }); });
+    const bx = X0 + kx * xF(u), by = gy - 22 - ky * yF(u);
+    set(ball, { cx: bx, cy: by, opacity: fr });
+    let d = ""; for (let i = 0; i <= 60; i++) { const tt = u * i / 60; d += `${i ? "L" : "M"}${(X0 + kx * xF(tt)).toFixed(1)},${(gy - 22 - ky * yF(tt)).toFixed(1)}`; } set(trail, { d, opacity: fr * (u > 0.05 ? 1 : 0) });
+    aX.draw(bx, by, bx + ux * 9, by, { op: fr * live }); aY.draw(bx, by, bx, by - vyF(u) * 9, { op: fr * live });
+    const k1 = ap(t, c("Horizontally there is no force"), 0.5), k2 = ap(t, c("Vertically there is only gravity"), 0.5);
+    r1.setAttribute("opacity", k1); r2.setAttribute("opacity", k2);
+    c1.write(-950, 405, t, c("Horizontally there is no force"), { speed: 0.02 }); c2.write(-480, 405, t, c("Vertically there is only gravity"), { speed: 0.02 });
+    // the top
+    const kt = ap(t, cTop, 0.6), tx = X0 + kx * xF(1.5), ty = gy - 22 - ky * yF(1.5);
+    set(gh, { cx: tx, cy: ty, opacity: kt }); gX.draw(tx, ty, tx + ux * 9, ty, { op: kt });
+    tvx.at(tx + 140, ty - 22, kt); tvy.at(tx - 8, ty + 50, kt);
+    mkA.atXY(1.5, 0, kt); mkB.atXY(1.5, 10, kt);
+  };
+});
+
+/* ========================================================== s10 — momentum-time graphs and force */
+section("s10", (g, c, id) => {
+  const H = heading(g, "⑩", "momentum-time graphs and force", S(id));
+  const T = 8, m = 2;
+  const pF = t => (t < 3 ? 3 * t : t < 5 ? 9 : 9 - 2 * (t - 5)), FF = t => (t < 3 ? 3 : t < 5 ? 0 : -2), vF = t => pF(t) / m, sI = integ(vF, T);
+  const G = stack(g, T, [{ lo: 0, hi: 5.8, yticks: [2, 4], ylab: "v\\,/\\,\\text{m s}^{-1}", color: COL.v }, { lo: 0, hi: 11.5, yticks: [3, 6, 9], ylab: "p\\,/\\,\\text{kg m s}^{-1}", color: COL.p },
+    { lo: -3.4, hi: 4.2, yticks: [-2, 3], ylab: "F\\,/\\,\\text{N}", color: COL.F }], [2, 4, 6, 8]);
+  const pV = G[0].plot(vF, { color: COL.v }), pP = G[1].plot(pF, { color: COL.p }), pFo = G[2].plot(FF, { color: COL.F });
+  const dV = G[0].dot(COL.v), dP = G[1].dot(COL.p), dF = G[2].dot(COL.F);
+  const hl = [[0, 3], [3, 5], [5, 8]].map(([a, b]) => G[1].plot(pF, { color: COL.F, w: 15, from: a, to: b }));
+  const tgP = G[1].tangent(COL.F, 5), guide = el("line", { stroke: MUTED, "stroke-width": 2.5, "stroke-dasharray": "8 8" }, g);
+  const dem = demo(g, { smax: 27, kv: 38, ka: 26, aCol: COL.F, aLab: "F", tag: "2 kg", ticks: 5 });
+  const times = hand(g, "× m", { size: 56, color: COL.p, weight: 700 });
+  const E1 = eqs(g, 60, -60, [
+    { tex: "p = m v", t: c("mass times velocity"), y: -90, size: 48 },
+    { tex: "F = \\dfrac{\\Delta p}{\\Delta t}", t: c("rate of change of momentum"), y: 30, final: true, uly: 72, ulw: 220, ulColor: COL.F, size: 50 },
+    { tex: "\\dfrac{\\text{kg m s}^{-1}}{\\text{s}} = \\text{kg m s}^{-2} = \\text{N}", t: c("Check the units"), y: 200, size: 42 },
+  ]);
+  const t1 = hand(g, "steep  →  big force", { size: 48, color: COL.F, weight: 700 }), t2 = hand(g, "flat  →  no resultant force", { size: 48, color: COL.F, weight: 700 }), t3 = hand(g, "down  →  force the other way", { size: 48, color: COL.F, weight: 700 });
+  const cN = c("Now forces and momentum"), u1 = lin([[cN + 0.6, 0], [cN + 9.0, 8]]), cT = c("So the gradient of a momentum-time graph"), probe = lin([[cT + 0.3, 0], [cT + 8.3, 8]]);
+  return t => {
+    H(t);
+    const f1 = ap(t, cN + 0.2, 0.5), f2 = ap(t, c("That's a gradient") - 0.3, 0.5);
+    G[0].show(f1); G[1].show(f1); G[2].show(f2);
+    const a = u1(t), pr = clamp(probe(t), 0, T), live1 = a > 0.03 && a < T - 0.03 ? 1 : 0, live2 = pr > 0.03 && pr < T - 0.03 ? 1 : 0;
+    pV.set(a, f1); pP.set(a, f1); dV.at(vF, a, f1 * live1); dP.at(pF, a, f1 * live1);
+    pFo.set(pr, f2); dF.at(FF, pr, f2 * live2);
+    const cu = t < cT + 0.3 ? a : pr, bump = Math.max(0, 1 - Math.abs(t - (cT + 0.3)) / 0.4);
+    dem(sI(cu), vF(cu), FF(cu), f1 * (1 - bump));
+    times.write(-130, -230, t, c("mass times velocity") + 0.3, { speed: 0.03 });
+    const kt = ap(t, cT, 0.4) * (1 - ap(t, cT + 8.4, 0.5));
+    tgP.at(pF, pr, 170, kt * live2); set(guide, { x1: GX + G[1].X(pr), x2: GX + G[1].X(pr), y1: GY3[1] + G[1].Y(pF(pr)), y2: GY3[2] + G[2].Y(FF(pr)), opacity: kt * live2 * 0.9 });
+    const hs = [c("A steep line"), c("A flat line"), c("sloping down")];
+    hl.forEach((h, i) => h.set(8, 0.55 * win(t, hs[i], i < 2 ? hs[i + 1] - 0.2 : hs[i] + 3.0, 0.4, 0.4)));
+    t1.write(60, 330, t, hs[0], { speed: 0.025 }); t2.write(60, 410, t, hs[1], { speed: 0.025 }); t3.write(60, 490, t, hs[2], { speed: 0.025 });
+    E1(t);
+  };
+});
+
+/* ========================================================== s11 — force-time graphs and impulse */
+section("s11", (g, c, id) => {
+  const H = heading(g, "⑪", "force-time graphs and impulse", S(id));
+  const gp = (o) => Graph(g, { x: -850, y: -330, w: 790, h: 520, color: COL.F, ylab: "F\\,/\\,\\text{N}", ...o });
+  const A = gp({ T: 6, lo: 0, hi: 6.6, yticks: [2, 4, 6], xticks: [1, 2, 3, 4, 5, 6] });
+  const B = gp({ T: 12, lo: 0, hi: 7400, yticks: [2000, 4000, 6000], xticks: [5, 10], xlab: "t\\,/\\,\\text{ms}" });
+  const C = gp({ T: 14, lo: -640, hi: 140, yticks: [-450], xticks: [5, 10], xlab: "t\\,/\\,\\text{ms}" });
+  const Fr = t => (t >= 1 && t <= 5 ? 4 : 0), Fv = t => 5.2 * Math.sin(Math.PI * t / 6), FB = t => (t > 0 && t < 10 ? 6000 * (1 - Math.abs(t - 5) / 5) : 0), FC = t => (t >= 1 && t <= 11 ? -450 : 0);
+  const pR = A.plot(Fr, { color: COL.F, n: 400 }), bR = A.band(Fr, { color: COL.p, op0: 0.4 }), pV = A.plot(Fv, { color: COL.F }), bV = A.band(Fv, { color: COL.p, op0: 0.4 });
+  const pB = B.plot(FB, { color: COL.F, n: 400 }), bB = B.band(FB, { color: COL.p, op0: 0.4 });
+  const pC = C.plot(FC, { color: COL.F, n: 400 }), bC = C.band(FC, { color: BAND_NEG, op0: 0.4 });
+  const lJ = A.label("J = F\\,\\Delta t", { color: COL.p, size: 46 }), lF = A.label("F", { color: COL.F }), lT = A.label("\\Delta t");
+  const lPk = B.label("6000\\ \\text{N}", { size: 34 }), lMs = B.label("10\\ \\text{ms}", { size: 34 }), lJB = B.label("\\tfrac12 \\times 0.010 \\times 6000", { color: COL.p, size: 36 });
+  const lN = C.label("-450\\ \\text{N}", { size: 34 }), lMs2 = C.label("10\\ \\text{ms}", { size: 34 }), lJC = C.label("J = -4.5\\ \\text{N s}", { color: BAND_NEG, size: 40 });
+  const sq = el("path", { stroke: INK, "stroke-width": 2, fill: "none" }, A.g); let sd = ""; for (let t = 1; t < 6; t++) sd += `M${A.X(t)},${A.Y(0)}V${A.Y(6.6)}`; for (let v = 1; v <= 6; v++) sd += `M0,${A.Y(v)}H${A.w}`; sq.setAttribute("d", sd);
+  const cV = c("For a varying force"), c2 = c("Take a triangular pulse"), c3 = c("Area below the axis counts as negative");
+  const E1 = eqs(g, 60, -280, [
+    { tex: "F = \\dfrac{\\Delta p}{\\Delta t}\\;\\Rightarrow\\;\\Delta p = F\\,\\Delta t", t: c("If force is the gradient of momentum"), y: -270, size: 44, until: c2 - 0.2 },
+    { tex: "J = F\\,\\Delta t = \\Delta p", t: c("called the impulse"), y: -140, size: 50, final: true, ulw: 330, ulColor: COL.p, until: c2 - 0.2 },
+    { tex: "\\text{N s} = \\text{kg m s}^{-1}", t: c("Check the units"), y: -20, size: 46, until: c2 - 0.2 },
+  ]);
+  const E2 = eqs(g, 60, -280, [
+    { tex: "J = \\tfrac12 \\times 0.010 \\times 6000", t: c("The area is a half"), y: -250, size: 44, until: c3 - 0.2 },
+    { tex: "= 30\\ \\text{N s}", t: c("thirty newton seconds"), y: -140, size: 50, final: true, ulw: 250, ulColor: COL.p, until: c3 - 0.2 },
+    { tex: "\\Delta p = +30\\ \\text{kg m s}^{-1}", t: c("So the momentum changes by thirty"), y: -30, size: 44, until: c3 - 0.2 },
+  ]);
+  const E3 = eqs(g, 60, -280, [
+    { tex: "p_i = 0.15 \\times (+20) = +3.0", t: c("The momentum goes from plus three"), y: -280, size: 40 },
+    { tex: "p_f = 0.15 \\times (-10) = -1.5", t: c("The momentum goes from plus three") + 1.8, y: -210, size: 40 },
+    { tex: "J = \\Delta p = -4.5\\ \\text{N s}", t: c("so the impulse is minus four point five"), y: -130, size: 44, final: true, ulw: 400, ulColor: BAND_NEG },
+    { tex: "F_{\\text{avg}} = \\dfrac{J}{\\Delta t} = \\dfrac{-4.5}{0.010} = -450\\ \\text{N}", t: c("the average force"), y: 0, size: 42 },
+  ]);
+  // the ball and the wall
+  el("path", { d: "M900,150V430", stroke: INK, "stroke-width": 8, "stroke-linecap": "round" }, g);
+  el("rect", { x: 900, y: 150, width: 34, height: 280, fill: "url(#hatch)" }, g);
+  const ball = el("circle", { r: 24, fill: "#d9e6f7", stroke: INK, "stroke-width": 3 }, g), vA = arrow(g, COL.v, 6);
+  const vl1 = tex(g, "20\\ \\text{m s}^{-1}", { size: 34, color: COL.v }), vl2 = tex(g, "10\\ \\text{m s}^{-1}", { size: 34, color: COL.v });
+  const cH = c("hits a wall"), cR = c("rebounds at ten");
+  const bx = lin([[cH - 1.2, 520], [cH + 0.9, 872], [cH + 1.05, 872], [cR + 1.8, 690]]);
+  return t => {
+    H(t);
+    const visA = ap(t, S(id) + 0.5, 0.6) * (1 - ap(t, c2 - 0.2, 0.6)), visB = ap(t, c2, 0.6) * (1 - ap(t, c3 - 0.2, 0.6)), visC = ap(t, c3, 0.6);
+    A.show(visA); B.show(visB); C.show(visC);
+    const ca = c("the area under a force-time graph"), kv = ap(t, cV, 0.6), kr = 1 - kv;
+    pR.set(ap(t, ca + 0.3, 1.0) * 6, visA * kr); bR.set(0, 6 * ap(t, ca + 1.0, 1.0), 1, null); bR.e.setAttribute("opacity", 0.4 * visA * kr * (ap(t, ca + 1.0, 0.3)));
+    lF.at(1, 2, visA * kr * ap(t, ca + 1.6, 0.4), { dx: -30 }); lT.at(3, 0, visA * kr * ap(t, c("For a constant force"), 0.4), { dy: -26 }); lJ.at(3, 2.1, visA * kr * ap(t, c("called the impulse"), 0.5));
+    pV.set(6, visA * kv); bV.set(0, 6, 1); bV.e.setAttribute("opacity", 0.4 * visA * kv);
+    sq.setAttribute("opacity", 0.38 * visA * kv * ap(t, c("count squares") - 0.3, 0.5));
+    pB.set(ap(t, c2 + 0.3, 1.0) * 12, visB); bB.set(0, 12 * ap(t, c("The area is a half") - 0.4, 1.2), 1); bB.e.setAttribute("opacity", 0.4 * visB * ap(t, c("The area is a half") - 0.4, 0.3));
+    lPk.at(5, 6000, visB * ap(t, c2 + 1.2, 0.4), { dy: -34 }); lMs.at(5, 0, visB * ap(t, c2 + 1.8, 0.4), { dy: -28 }); lJB.at(5, 2600, visB * ap(t, c("The area is a half") + 0.4, 0.5));
+    pC.set(ap(t, c3 + 0.3, 1.0) * 14, visC); bC.set(0, 14 * ap(t, c("hits a wall") - 0.5, 1.2), 1); bC.e.setAttribute("opacity", 0.4 * visC * ap(t, c("hits a wall") - 0.5, 0.3));
+    lN.at(6, -450, visC * ap(t, cH, 0.4), { dy: 36 }); lMs2.at(6, 0, visC * ap(t, cH + 0.6, 0.4), { dy: -28 }); lJC.at(6, -250, visC * ap(t, c("so the impulse is minus four point five"), 0.5));
+    // ball
+    const kb = ap(t, c3 + 0.6, 0.6), x = bx(t), rebounding = t > cH + 1.0, v = rebounding ? -10 : 20, moving = (t < cH + 0.9 || t > cH + 1.1) ? 1 : 0;
+    set(ball, { cx: x, cy: 290, opacity: kb });
+    vA.draw(x, 230, x + v * 5, 230, { op: kb * moving }); vl1.at(x + 40, 190, kb * (rebounding ? 0 : moving)); vl2.at(x - 30, 190, kb * (rebounding ? moving : 0));
+    E1(t); E2(t); E3(t);
+  };
+});
+
+/* ========================================================== s12 — force to momentum to velocity */
+section("s12", (g, c, id) => {
+  const H = heading(g, "⑫", "from force to momentum to velocity", S(id));
+  const T = 8, m = 4;
+  const FF = t => (t < 2 ? 2 * t : t < 5 ? 4 : t < 7 ? 4 - 2 * (t - 5) : 0), pI = integ(FF, T, 2400), pF = t => pI(t), vF = t => pI(t) / m, sI = integ(vF, T);
+  const G = stack(g, T, [{ lo: 0, hi: 5.4, yticks: [2, 4], ylab: "F\\,/\\,\\text{N}", color: COL.F }, { lo: 0, hi: 23, yticks: [10, 20], ylab: "p\\,/\\,\\text{kg m s}^{-1}", color: COL.p },
+    { lo: 0, hi: 6.4, yticks: [2, 4], ylab: "v\\,/\\,\\text{m s}^{-1}", color: COL.v }], [2, 4, 6, 8]);
+  const pFo = G[0].plot(FF, { color: COL.F, n: 300 }), pP = G[1].plot(pF, { color: COL.p, n: 300 }), pV = G[2].plot(vF, { color: COL.v, n: 300 });
+  const bF = G[0].band(FF, { color: COL.p, op0: 0.4 }), dF = G[0].dot(COL.F), dP = G[1].dot(COL.p), dV = G[2].dot(COL.v);
+  const hs = [[0, 2], [2, 5], [7, 8]].map(([a, b]) => G[1].plot(pF, { color: INK, w: 15, from: a, to: b, n: 120 }));
+  const dem = demo(g, { smax: 24, kv: 36, ka: 40, aCol: COL.F, aLab: "F", tag: "4 kg", ticks: 6 });
+  const div = hand(g, "÷ 4 kg", { size: 52, color: COL.v, weight: 700 });
+  const L1 = ladder(g, { x: 360, y0: -110, dy: 190, items: [{ tex: "p", color: COL.p }, { tex: "F", color: COL.F }] });
+  const L2 = ladder(g, { x: 740, y0: -110, dy: 190, items: [{ tex: "s", color: COL.s }, { tex: "v", color: COL.v }], labels: false });
+  const tw = hand(g, "force is to momentum", { size: 50, weight: 700 }), tw2 = hand(g, "what velocity is to displacement", { size: 50, weight: 700, color: COL.v });
+  const cF = c("Start with a force-time graph"), c2 = c("The momentum-time graph is the running total"), cG = c("While the force is growing"), cS = c("While the force is steady"), cL = c("When the force fades"), c3 = c("Divide by the mass"), cK = c("Force is to momentum");
+  const uF = lin([[cF + 0.4, 0], [cF + 6.4, 8]]), uP = lin([[cG - 0.2, 0], [cS - 0.1, 2], [cL - 0.3, 5], [cL + 2.4, 8]]), uV = lin([[c3 + 0.3, 0], [c3 + 3.5, 8]]);
+  return t => {
+    H(t);
+    const f1 = ap(t, S(id) + 0.4, 0.5), f2 = ap(t, c2 - 0.2, 0.5), f3 = ap(t, c3 - 0.2, 0.5);
+    G[0].show(f1); G[1].show(f2); G[2].show(f3);
+    const a = uF(t), p = uP(t), v = uV(t), live = x => (x > 0.03 && x < T - 0.03 ? 1 : 0);
+    pFo.set(a, f1); dF.at(FF, a, f1 * live(a) * (t < c2 ? 1 : 0));
+    const pp = t < cG - 0.2 ? 0 : p; pP.set(pp, f2); dP.at(pF, pp, f2 * live(pp)); bF.set(0, pp, 1);
+    pV.set(v, f3); dV.at(vF, v, f3 * live(v));
+    const cu = t < cG - 0.2 ? 0 : t < c3 ? p : T;
+    dem(sI(cu), vF(cu), FF(cu), f1);
+    const ws = [[cG, cS - 0.1], [cS, cL - 0.2], [cL + 1.6, cL + 4.5]];
+    hs.forEach((h, i) => h.set(8, 0.5 * win(t, ws[i][0], ws[i][1], 0.4, 0.4)));
+    div.write(-130, -20, t, c3 + 0.2, { speed: 0.04 });
+    L1(t, cK - 0.3, cK + 0.6, cK + 1.8); L2(t, cK + 0.6, cK + 1.4, cK + 2.6);
+    tw.write(60, 330, t, cK, { speed: 0.025 }); tw2.write(60, 410, t, cK + 1.6, { speed: 0.025 });
+  };
+});
+
+/* ========================================================== s13 — contact time and rebounds */
+section("s13", (g, c, id) => {
+  const H = heading(g, "⑬", "contact time and rebounds", S(id));
+  const GOLD = "#f5d36b", CHB = "#9ad1ff";
+  const bump = (t, t0, w, pk) => (t > t0 && t < t0 + w ? pk * (1 - Math.cos(2 * Math.PI * (t - t0) / w)) / 2 : 0);
+  const Cn = t => bump(t, 10, 10, 100), Pl = t => bump(t, 10, 100, 10), St = t => bump(t, 5, 20, 50), Bn = t => bump(t, 5, 20, 100);
+  const A = Graph(g, { x: -900, y: -330, w: 820, h: 520, T: 125, lo: 0, hi: 112, color: COL.F, ylab: "F", xlab: "t", yticks: [], xticks: [] });
+  const B = Graph(g, { x: -900, y: -330, w: 820, h: 520, T: 40, lo: 0, hi: 112, color: COL.F, ylab: "F", xlab: "t", yticks: [], xticks: [] });
+  const pc = A.plot(Cn, { color: COL.F, w: 7, n: 500 }), pp = A.plot(Pl, { color: GOLD, w: 7, n: 500 }), bc = A.band(Cn, { color: COL.F, op0: 0.4 }), bp = A.band(Pl, { color: GOLD, op0: 0.4 });
+  const ps = B.plot(St, { color: CHB, w: 7, n: 300 }), pb = B.plot(Bn, { color: COL.F, w: 7, n: 300 }), bs = B.band(St, { color: CHB, op0: 0.4 }), bb = B.band(Bn, { color: COL.F, op0: 0.4 });
+  const la = hand(g, "concrete: short, tall", { size: 44, color: COL.F, weight: 700 }), lb = hand(g, "pillow: long, low", { size: 44, color: GOLD, weight: 700 }), ls = hand(g, "same area  =  same Δp", { size: 52, weight: 700 });
+  const lst = hand(g, "stop:  area 1", { size: 46, color: CHB, weight: 700 }), lbo = hand(g, "bounce:  area 2", { size: 46, color: COL.F, weight: 700 });
+  const note = hand(g, "airbags  ·  crumple zones  ·  bent knees", { size: 46, color: MUTED, weight: 700 });
+  // eggs
+  const SY = 300, concrete = el("rect", { x: 160, y: SY, width: 300, height: 70, fill: "#566379", stroke: INK, "stroke-width": 4 }, g);
+  const pillow = el("path", { fill: "#d98cab", stroke: INK, "stroke-width": 4 }, g);
+  const mkEgg = () => { const gg = el("g", {}, g); el("ellipse", { rx: 30, ry: 38, fill: "#f4ecd8", stroke: INK, "stroke-width": 3 }, gg); const cr = el("path", { d: "M-22,10L-8,-2L-2,14L10,2L22,16", stroke: BAND_NEG, "stroke-width": 4, fill: "none", "stroke-linecap": "round" }, gg); return { gg, cr }; };
+  const e1 = mkEgg(), e2 = mkEgg();
+  const cE = c("Drop an egg on concrete"), cPl = c("Drop it on a pillow"), cEq = c("The areas are equal"), cAir = c("airbags"), cBn = c("a bounce hits harder"), cSt = c("Stopping removes the momentum"), cBo = c("Bouncing back at the same speed"), cDb = c("so the change is double");
+  const fall = (tt, t0) => { const x = clamp((tt - t0) / 1.1, 0, 1); return { y: lerp(-170, SY - 38, x * x), s: Math.max(0, tt - t0 - 1.1) }; };
+  // bounce diagrams
+  el("path", { d: "M880,-150V420", stroke: INK, "stroke-width": 8, "stroke-linecap": "round" }, g);
+  const bl1 = el("circle", { r: 24, fill: "#d9e6f7", stroke: INK, "stroke-width": 3 }, g), bl2 = el("circle", { r: 24, fill: "#d9e6f7", stroke: INK, "stroke-width": 3 }, g);
+  const aIn1 = arrow(g, COL.v, 6), aIn2 = arrow(g, COL.v, 6), aOut2 = arrow(g, COL.F, 6);
+  const dp1 = tex(g, "\\Delta p = m u", { size: 40, color: CHB }), dp2 = tex(g, "\\Delta p = 2 m u", { size: 40, color: COL.F });
+  return t => {
+    H(t);
+    const v1 = ap(t, S(id) + 0.4, 0.5) * (1 - ap(t, cBn - 0.3, 0.6)), v2 = ap(t, cBn + 0.1, 0.6);
+    A.show(v1); B.show(v2);
+    const f1 = fall(t, cE + 0.3), f2 = fall(t, cPl + 0.3), k1 = ap(t, cE - 0.2, 0.5) * (1 - ap(t, cBn - 0.3, 0.6));
+    const sc = smooth(0, 0.18, f1.s), dip = 70 * smooth(0, 1.8, f2.s);
+    concrete.setAttribute("opacity", k1);
+    pillow.setAttribute("d", `M560,${SY}Q710,${SY + 2 * dip} 860,${SY}V${SY + 80}H560Z`); pillow.setAttribute("opacity", k1 * ap(t, cPl - 0.2, 0.5));
+    e1.gg.setAttribute("transform", `translate(310,${f1.y}) translate(0,${38 * 0.42 * sc}) scale(${1 + 0.4 * sc},${1 - 0.42 * sc})`); e1.gg.setAttribute("opacity", k1); e1.cr.setAttribute("opacity", smooth(0.08, 0.18, f1.s));
+    e2.gg.setAttribute("transform", `translate(710,${f2.y + dip})`); e2.gg.setAttribute("opacity", k1 * ap(t, cPl - 0.2, 0.5)); e2.cr.setAttribute("opacity", 0);
+    // graph time: contact at 10 units, 100 units per 1.8 s
+    const ug1 = 10 + f1.s / 0.018 * (f1.y >= SY - 38 - 0.01 ? 1 : 0), ug2 = 10 + f2.s / 0.018 * (f2.y >= SY - 38 - 0.01 ? 1 : 0);
+    pc.set(f1.s > 0 ? ug1 : 0, v1); pp.set(f2.s > 0 ? ug2 : 0, v1);
+    bc.set(10, Math.max(10, ug1), 1); bc.e.setAttribute("opacity", 0.4 * v1 * (f1.s > 0 ? 1 : 0)); bp.set(10, Math.max(10, ug2), 1); bp.e.setAttribute("opacity", 0.4 * v1 * (f2.s > 0 ? 1 : 0));
+    la.write(-760, -270, t, cE + 1.4, { speed: 0.03, op: v1 }); lb.write(-640, 60, t, cPl + 1.8, { speed: 0.03, op: v1 });
+    ls.write(-860, 260, t, cEq, { speed: 0.03, op: v1 }); note.write(-860, 340, t, cAir, { speed: 0.02 });
+    // bounce vs stop
+    const kS = ap(t, cSt, 0.5) * v2, kB = ap(t, cBo, 0.5) * v2;
+    ps.set(ap(t, cSt, 1.0) * 40, v2); bs.set(0, 40 * ap(t, cSt, 1.2), 1); bs.e.setAttribute("opacity", 0.4 * v2 * ap(t, cSt, 0.3));
+    pb.set(ap(t, cBo, 1.0) * 40, v2); bb.set(0, 40 * ap(t, cBo, 1.2), 1); bb.e.setAttribute("opacity", 0.4 * v2 * ap(t, cBo, 0.3));
+    lst.write(-350, -40, t, cSt + 0.8, { speed: 0.03, op: v2 }); lbo.write(-350, -270, t, cBo + 0.8, { speed: 0.03, op: v2 });
+    set(bl1, { cx: 640, cy: -40, opacity: kS }); aIn1.draw(640, -90, 760, -90, { op: kS }); dp1.at(720, 40, kS);
+    set(bl2, { cx: 640, cy: 230, opacity: kB }); aIn2.draw(560, 170, 700, 170, { op: kB * 0.6 }); aOut2.draw(700, 290, 560, 290, { op: kB }); dp2.at(720, 360, kB);
+  };
+});
+
+/* ========================================================== s14 — collisions on graphs */
+section("s14", (g, c, id) => {
+  const H = heading(g, "⑭", "collisions on graphs", S(id));
+  const T = 7, m1 = 2, m2 = 1, C1 = COL.c1, C2 = COL.c2;
+  const F2 = t => (t > 3 && t < 4 ? 4 * (1 - Math.cos(2 * Math.PI * (t - 3))) : 0), F1 = t => -F2(t);
+  const p2 = t => (t <= 3 ? 0 : t >= 4 ? 4 : 4 * ((t - 3) - Math.sin(2 * Math.PI * (t - 3)) / (2 * Math.PI))), p1 = t => 6 - p2(t), pt = () => 6;
+  const s1 = integ(t => p1(t) / m1, T), s2 = integ(t => p2(t) / m2, T);
+  const G = stack(g, T, [{ lo: -9.5, hi: 9.5, yticks: [-8, 8], ylab: "F\\,/\\,\\text{N}", color: INK }, { lo: -1, hi: 8, yticks: [2, 4, 6], ylab: "p\\,/\\,\\text{kg m s}^{-1}", color: COL.p }], [1, 2, 3, 4, 5, 6, 7]);
+  const pF2 = G[0].plot(F2, { color: C2, n: 400, from: 2.8, to: 4.2 }), pF1 = G[0].plot(F1, { color: C1, n: 400, from: 2.8, to: 4.2 });
+  const bF2 = G[0].band(F2, { color: C2, op0: 0.42, part: "pos" }), bF1 = G[0].band(F1, { color: C1, op0: 0.42, part: "neg" });
+  const lA = G[0].label("+4\\ \\text{N s}", { color: C2, size: 36 }), lB = G[0].label("-4\\ \\text{N s}", { color: C1, size: 36 }), mir = G[0].note("mirror images", { size: 40, color: INK });
+  const pP1 = G[1].plot(p1, { color: C1, n: 300 }), pP2 = G[1].plot(p2, { color: C2, n: 300 }), pPt = G[1].plot(pt, { color: COL.p, n: 300, dash: "18 11", w: 7 });
+  const t1 = G[1].label("\\text{cart }1", { color: C1, size: 34 }), t2 = G[1].label("\\text{cart }2", { color: C2, size: 34 }), tt = G[1].label("\\text{total}", { color: COL.p, size: 34 });
+  // carts
+  const tr = el("path", { d: "M50,-230H940", stroke: MUTED, "stroke-width": 4, "stroke-linecap": "round" }, g);
+  const cA = cart(g, { body: C1, tag: "1" }), cB = cart(g, { body: C2, tag: "2" }), mA = tex(g, "2\\ \\text{kg}", { size: 34, color: C1 }), mB = tex(g, "1\\ \\text{kg}", { size: 34, color: C2 });
+  const fA = arrow(g, C1, 7), fB = arrow(g, C2, 7);
+  const E1 = eqs(g, 60, -60, [
+    { tex: "J_1 = -J_2\\;\\Rightarrow\\;\\Delta p_1 = -\\Delta p_2", t: c("Their areas"), y: -40, size: 44 },
+    { tex: "p_1 + p_2 = \\text{constant}", t: c("conservation of momentum"), y: 100, size: 52, final: true, ulw: 460, ulColor: COL.p },
+  ]);
+  const cS = c("Finally, a collision between two carts"), cM = c("mirror images"), cEq = c("equal and opposite"), cP = c("Now plot the momentum");
+  const uA = lin([[cS + 0.4, 0], [cS + 10.4, 7]]), uB = lin([[cP + 0.4, 0], [cP + 8.4, 7]]);
+  return t => {
+    H(t);
+    const fr1 = ap(t, S(id) + 0.5, 0.6), fr2 = ap(t, cP - 0.3, 0.5);
+    G[0].show(fr1); G[1].show(fr2);
+    const a = uA(t), b = uB(t), u = t < cP + 0.4 ? a : b;
+    pF2.set(a, fr1); pF1.set(a, fr1);
+    pP1.set(b, fr2); pP2.set(b, fr2); pPt.set(b, fr2);
+    const ka = ap(t, cEq, 0.6);
+    bF2.set(0, 7 * ka, 1); bF1.set(0, 7 * ka, 1); lA.at(4.15, 4.5, ap(t, cEq + 0.8, 0.5), { anchor: "l" }); lB.at(4.15, -4.5, ap(t, cEq + 0.8, 0.5), { anchor: "l" });
+    mir.write(4.25, 0, t, cM, { dx: 0, dy: -12, speed: 0.03 });
+    const px1 = 80 + 30 * s1(u), px2 = Math.min(875, 80 + 30 * (13.35 + s2(u))), bump = Math.max(0, 1 - Math.abs(t - (cP + 0.4)) / 0.4), op = fr1 * (1 - bump);
+    cA.at(px1, -230, op); cB.at(px2, -230, op); mA.at(px1, -165, op); mB.at(px2, -165, op);
+    const cx = (px1 + px2) / 2, f = F2(u), kf = op * (f > 0.05 ? 1 : 0);
+    fA.draw(cx, -265, cx - f * 12, -265, { op: kf }); fB.draw(cx, -265, cx + f * 12, -265, { op: kf });
+    const cl = c("One line rises"); t1.at(0.3, 6, ap(t, cP + 1.0, 0.4), { dy: -28, anchor: "l" }); t2.at(5.6, 4, ap(t, cl, 0.4), { dy: -28 }); tt.at(0.3, 6, ap(t, c("and the total"), 0.4), { dy: 32, anchor: "l" });
+    E1(t);
+  };
+});
+
+/* ========================================================== s15 — the two ladders */
+section("s15", (g, c, id) => {
+  const H = heading(g, "⑮", "the two ladders", S(id));
+  const L1 = ladder(g, { x: -300, y0: -330, dy: 190, r: 62, size: 66, lsize: 52, items: [{ tex: "s", color: COL.s }, { tex: "v", color: COL.v }, { tex: "a", color: COL.a }] });
+  const L2 = ladder(g, { x: 420, y0: -330, dy: 190, r: 62, size: 66, lsize: 52, items: [{ tex: "p", color: COL.p }, { tex: "F", color: COL.F }] });
+  const cap1 = hand(g, "kinematics", { size: 46, anchor: "middle", color: MUTED }), cap2 = hand(g, "forces & momentum", { size: 46, anchor: "middle", color: MUTED });
+  const u1 = tex(g, "\\text{m}\\ \\to\\ \\text{m s}^{-1}\\ \\to\\ \\text{m s}^{-2}", { size: 38, color: MUTED }), u2 = tex(g, "\\text{kg m s}^{-1}\\ \\to\\ \\text{N}", { size: 38, color: MUTED });
+  const q = ["1   what are the axes?", "2   what do the gradient and the area mean, by their units?", "3   does the graph go below zero, so signs matter?"].map(s => hand(g, s, { size: 58, weight: 700 }));
+  const cq = [c("What are the axes"), c("So what do the gradient and the area mean"), c("And does the graph go below zero")];
+  return t => {
+    H(t);
+    const cg = c("gradients go down"), ca = c("areas go up"), cm = c("Momentum and force");
+    L1(t, S(id) + 0.5, cg, ca); L2(t, cm - 0.3, c("the gradient of momentum is force"), c("the area under force is the change in momentum"));
+    cap1.write(-300, -415, t, S(id) + 0.7, { speed: 0.03 }); cap2.write(420, -415, t, cm, { speed: 0.03 });
+    u1.at(-300, 175, ap(t, ca + 1.0, 0.6)); u2.at(420, 45, ap(t, c("the area under force is the change in momentum") + 1.0, 0.6));
+    q.forEach((h, i) => h.write(-880, 330 + i * 90, t, cq[i], { speed: 0.02 }));
+  };
+});
+
+/* ========================================================== camera: glide from panel to panel, swooping out between them */
+const CAM = [];
+const key = (t, c, z = 1, r = 0) => CAM.push({ t, c, z, r });
+{
+  const ids = CFG.scenes.map(s => s.id);
+  ids.forEach((id, i) => {
+    const [cx, cy] = center(id), last = i === ids.length - 1;
+    key(S(id) + (i === 0 ? 0 : 0.9), [cx, cy], 1);
+    if (!last) {
+      key(E(id) - 0.5, [cx, cy], 1);
+      const [nx, ny] = center(ids[i + 1]);
+      key((E(id) - 0.5 + S(ids[i + 1]) + 0.9) / 2, [(cx + nx) / 2, (cy + ny) / 2], 0.62);
+    }
+  });
+  const all = [2 * PW, PH];
+  key(E("s15") - 5.5, center("s15"), 1);
+  key(TOTAL - 0.4, all, 0.168);
+}
+CAM.sort((a, b) => a.t - b.t);
+
+const cam = document.getElementById("cam");
+function cameraAt(t) {
+  let i = 0; while (i < CAM.length - 2 && CAM[i + 1].t <= t) i++;
+  const a = CAM[i], b = CAM[i + 1], k = ease(clamp((t - a.t) / Math.max(1e-3, b.t - a.t)));
+  // zoom interpolates in log space so a big pull-back feels even
+  const z = Math.exp(lerp(Math.log(a.z), Math.log(b.z), k)), r = lerp(a.r, b.r, k);
+  const cx = lerp(a.c[0], b.c[0], k), cy = lerp(a.c[1], b.c[1], k);
+  cam.setAttribute("transform", `translate(960 540) scale(${z}) rotate(${r}) translate(${-cx} ${-cy})`);
+}
+
+/* ========================================================== render */
+function renderAt(t) {
+  t = clamp(t, 0, TOTAL - 1e-4);
+  cameraAt(t);
+  for (const s of SECS) s.update(t);
+  const f = Math.max(1 - smooth(0.05, 0.6, t), smooth(TOTAL - 0.8, TOTAL - 0.05, t));
+  document.getElementById("fade").style.opacity = f.toFixed(3);
+  return t;
+}
+
+await document.fonts.ready;
+await Promise.all([document.fonts.load("600 50px Hand", "abc"), document.fonts.load("700 50px Hand", "abc"),
+  document.fonts.load("italic 40px KaTeX_Math", "mg"), document.fonts.load("40px KaTeX_Main", "=+"), document.fonts.load("40px KaTeX_Size1", "(")]);
+window.TOTAL_SECONDS = TOTAL;
+window.renderAt = renderAt;
+renderAt(params.has("t") ? parseFloat(params.get("t")) : 0);
+window.__ready = true;
+
+if (PREVIEW) {
+  const stage = document.getElementById("stage"), controls = document.getElementById("controls");
+  controls.style.display = "flex";
+  const fit = () => { const s = Math.min(innerWidth / 1920, (innerHeight - 50) / 1080); stage.style.transform = `scale(${s})`; };
+  addEventListener("resize", fit); fit();
+  const scrub = document.getElementById("scrub"), clock = document.getElementById("clock"), btn = document.getElementById("play");
+  scrub.max = TOTAL;
+  const audios = CFG.scenes.map(s => { const a = new Audio(`/audio/${s.id}.wav`); a.preload = "auto"; return a; });
+  let playing = false, t0 = 0, wall0 = 0, cur = 0, curScene = -1;
+  const sceneIndex = t => CFG.scenes.findIndex(s => t >= S(s.id) && t < E(s.id));
+  const syncAudio = t => { const i = sceneIndex(t); if (i !== curScene) { audios.forEach(a => a.pause()); curScene = i; if (playing && i >= 0) { audios[i].currentTime = t - S(CFG.scenes[i].id); audios[i].play().catch(() => {}); } } };
+  const show = t => { cur = t; renderAt(t); scrub.value = t; clock.textContent = `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`; };
+  scrub.addEventListener("input", () => { playing = false; btn.textContent = "Play"; audios.forEach(a => a.pause()); curScene = -1; show(parseFloat(scrub.value)); });
+  btn.addEventListener("click", () => { playing = !playing; btn.textContent = playing ? "Pause" : "Play"; t0 = cur; wall0 = performance.now(); curScene = -1; if (!playing) audios.forEach(a => a.pause()); });
+  const loop = () => { if (playing) { const t = t0 + (performance.now() - wall0) / 1000; if (t >= TOTAL) { playing = false; btn.textContent = "Play"; } show(Math.min(t, TOTAL)); syncAudio(t); } requestAnimationFrame(loop); };
+  show(params.has("t") ? parseFloat(params.get("t")) : 0); loop();
+}
+</script>
+</body>
+</html>
