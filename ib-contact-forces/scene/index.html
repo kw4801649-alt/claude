@@ -101,6 +101,11 @@ function track(keys) {
   };
 }
 const fmt = (x, d = 2) => x.toFixed(d);
+const lin = keys => t => {                       // piecewise-LINEAR timing map (keys: [time, value])
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 0; i < keys.length - 1; i++) { const [t0, v0] = keys[i], [t1, v1] = keys[i + 1]; if (t < t1) return t1 - t0 < 1e-6 ? v1 : lerp(v0, v1, (t - t0) / (t1 - t0)); }
+  return keys[keys.length - 1][1];
+};
 
 /* ========================================================== drawing kit (SVG + KaTeX) */
 const NS = "http://www.w3.org/2000/svg";
@@ -184,7 +189,7 @@ function eqs(parent, x, y, items, { size = 46, gap = 100 } = {}) {
   return t => { for (const L of lines) {
     const k = ap(t, L.t, 0.4) * (L.until ? 1 - ap(t, L.until, 0.4) : 1);
     L.m.at(x + (L.dx || 0), L.y, k, { anchor: "l", dy: (1 - k) * 12 });
-    if (L.ul) L.ul.draw(x + (L.dx || 0) - 6, L.y + 40, x + (L.dx || 0) + (L.ulw || 420), L.y + 40, ap(t, L.t + 0.5, 0.6), k);
+    if (L.ul) L.ul.draw(x + (L.dx || 0) - 6, L.y + (L.uly ?? 40), x + (L.dx || 0) + (L.ulw || 420), L.y + (L.uly ?? 40), ap(t, L.t + 0.5, 0.6), k);
   } };
 }
 const unit = a => [Math.cos(a * D2R), Math.sin(a * D2R)];   // screen angle, clockwise from +x
@@ -850,7 +855,7 @@ section("x1", (g, c, id) => {
     { tex: "F_N = mg - F\\sin\\theta = 98.1 - 15 = 83.1\\ \\text{N}", t: c("Vertically"), size: 40 },
     { tex: "f = \\mu F_N = 0.2 \\times 83.1 = 16.6\\ \\text{N}", t: c("So the friction"), size: 40 },
     { tex: "F\\cos\\theta = 26.0\\ \\text{N}", t: c("The rope pulls forward"), size: 40 },
-    { tex: "a = \\dfrac{26.0 - 16.6}{10} = 0.94\\ \\text{m s}^{-2}", t: c("so the acceleration"), final: true, uly: 78, ulw: 520, ulColor: COL.F, size: 46, y: 140 },
+    { tex: "a = \\dfrac{26.0 - 16.6}{10} = 0.94\\ \\text{m s}^{-2}", t: c("so the acceleration"), final: true, uly: 88, ulw: 520, ulColor: COL.F, size: 46, y: 140 },
   ]);
   return t => {
     H(t);
@@ -917,7 +922,7 @@ section("x3", (g, c, id) => {
     { tex: "mg\\sin\\theta = 28.1\\ \\text{N}", t: c("Down the slope"), size: 42, y: -230 },
     { tex: "\\mu_d\\, mg\\cos\\theta = 0.3 \\times 40.2 = 12.0\\ \\text{N}", t: c("Friction, μd"), size: 42, y: -130 },
     { tex: "F_{\\text{net}} = 28.1 - 12.0 = 16.1\\ \\text{N}", t: c("The resultant"), size: 42, y: -30 },
-    { tex: "a = \\dfrac{16.1}{5} = 3.2\\ \\text{m s}^{-2}", t: c("so the acceleration"), final: true, uly: 78, ulw: 380, ulColor: COL.F, size: 46, y: 100 },
+    { tex: "a = \\dfrac{16.1}{5} = 3.2\\ \\text{m s}^{-2}", t: c("so the acceleration"), final: true, uly: 88, ulw: 380, ulColor: COL.F, size: 46, y: 100 },
   ]);
   return t => {
     H(t);
@@ -926,10 +931,10 @@ section("x3", (g, c, id) => {
     blk.at(C0[0], C0[1], -a, k);
     const d = ap(t, cB + 0.6, 0.6), Lw = 3.6;
     const dn = [-u[0], -u[1]], inn = [-n[0], -n[1]];
-    W.draw(C0[0], C0[1], C0[0], C0[1] + 49.1 * Lw, { p: d, op: d }); lW.at(C0[0] + 30, C0[1] + 49.1 * Lw - 8, d, { anchor: "l" });
+    W.draw(C0[0], C0[1], C0[0], C0[1] + 49.1 * Lw, { p: d, op: d }); lW.at(C0[0] + 30, C0[1] + 49.1 * Lw * 0.55, d, { anchor: "l" });
     N.draw(C0[0], C0[1], ...add(C0, n, 40.2 * Lw), { p: d, op: d }); lN.at(...add(add(C0, n, 40.2 * Lw + 30), [-50, 0]), d, { anchor: "r" });
     Cp.draw(C0[0], C0[1], ...add(C0, dn, 28.1 * Lw), { p: ap(t, c("Down the slope"), 0.6), dash: "12 9", op: d }); lC.at(...add(add(C0, dn, 28.1 * Lw * 0.5), [-70, -40]), ap(t, c("Down the slope") + 0.5, 0.4), { anchor: "r" });
-    Fr.draw(...add(C0, u, 20), ...add(C0, u, 20 + 12.0 * Lw), { p: ap(t, c("Friction, μd"), 0.6), op: d }); lFr.at(...add(add(C0, u, 20 + 12.0 * Lw + 50), [0, -40]), ap(t, c("Friction, μd") + 0.5, 0.4), { anchor: "l" });
+    const Pf = add(C0, inn, 50); Fr.draw(...add(Pf, u, 10), ...add(Pf, u, 10 + 12.0 * Lw * 1.4), { p: ap(t, c("Friction, μd"), 0.6), op: d }); lFr.at(...add(add(Pf, u, 10 + 12.0 * Lw * 1.4 + 40), [10, 30]), ap(t, c("Friction, μd") + 0.5, 0.4), { anchor: "l" });
     E1(t);
   };
 });
@@ -953,8 +958,8 @@ section("x4", (g, c, id) => {
     const k = ap(t, S(id) + 0.5, 0.6), th = 25, P0 = [-860, 330], { u, n } = inc(P0, th, k);
     const C0 = add(add(P0, u, 470), n, 58); blk.at(C0[0], C0[1], -th, k);
     const Lw = 2.6, f = ap(t, c("A ten kilogram block is held") + 1.2, 0.7), nn = [-n[0], -n[1]], dn = [-u[0], -u[1]];
-    W.draw(C0[0], C0[1], C0[0], C0[1] + 98.1 * Lw, { p: ap(t, c("A ten kilogram block is held") + 0.4, 0.6) }); lW.at(C0[0] + 30, C0[1] + 98.1 * Lw - 10, f, { anchor: "l" });
-    F.draw(C0[0] - 260, C0[1] - 20, C0[0] - 260 + 45.7 * 4, C0[1] - 20, { p: f }); lF.at(C0[0] - 260 + 45.7 * 2, C0[1] - 62, f);
+    W.draw(C0[0], C0[1], C0[0], C0[1] + 98.1 * Lw, { p: ap(t, c("A ten kilogram block is held") + 0.4, 0.6) }); lW.at(C0[0] + 30, C0[1] + 98.1 * Lw * 0.5, f, { anchor: "l" });
+    F.draw(C0[0] - 260, C0[1] - 20, C0[0] - 260 + 45.7 * 4, C0[1] - 20, { p: f }); lF.at(C0[0] - 260 + 45.7 * 2, C0[1] + 22, f);
     const a = ap(t, c("Along the slope"), 0.6);
     const fx = [C0[0] - 260, C0[1] - 20], fe = [fx[0] + 45.7 * 4, fx[1]], fa = add(fx, u, 45.7 * 4 * Math.cos(th * D2R));
     N.draw(C0[0], C0[1], ...add(C0, n, 108 * Lw * 0.62), { p: ap(t, c("Perpendicular to the slope"), 0.6) }); lN.at(...add(add(C0, n, 108 * Lw * 0.62 + 36), [-50, 0]), ap(t, c("Perpendicular to the slope") + 0.5, 0.4), { anchor: "r" });
@@ -987,9 +992,9 @@ section("x5", (g, c, id) => {
     a1.draw(L[0], L[1], 110, 0, 30, kk); a2.draw(R[0], R[1], 110, 180 - 60, 180, kk); t30.at(L[0] + 160, L[1] + 40, kk); t60.at(R[0] - 150, R[1] + 70, kk);
     const sc = 3.06, d1 = [-Math.cos(30 * D2R), -Math.sin(30 * D2R)], d2 = [Math.cos(60 * D2R), -Math.sin(60 * D2R)];
     const w = ap(t, c("Sideways") - 0.6, 0.6), f1 = ap(t, c("So T one is half"), 0.6), f2 = ap(t, c("And T two is"), 0.6);
-    W.draw(PT[0], PT[1] + 14, PT[0], PT[1] + 14 + 98.1 * sc, { p: w }); lW.at(PT[0] + 30, PT[1] + 14 + 98.1 * sc, w, { anchor: "l" });
+    W.draw(PT[0], PT[1] + 134, PT[0], PT[1] + 134 + 98.1 * sc * 0.75, { p: w }); lW.at(PT[0] + 30, PT[1] + 134 + 98.1 * sc * 0.4, w, { anchor: "l" });
     T1.draw(PT[0], PT[1], ...add(PT, d1, 49 * sc), { p: ap(t, c("Sideways") - 0.2, 0.6) }); T2.draw(PT[0], PT[1], ...add(PT, d2, 85 * sc), { p: ap(t, c("Sideways") - 0.2, 0.6) });
-    l1.at(...add(add(PT, d1, 49 * sc + 10), [-40, -28]), f1, { anchor: "r" }); l2.at(...add(add(PT, d2, 85 * sc + 10), [40, -10]), f2, { anchor: "l" });
+    l1.at(...add(add(PT, d1, 49 * sc * 0.5), [-8, 40]), f1, { anchor: "r" }); l2.at(...add(add(PT, d2, 85 * sc * 0.5), [30, 24]), f2, { anchor: "l" });
     E1(t);
   };
 });
@@ -1004,7 +1009,7 @@ section("x6", (g, c, id) => {
   const l1 = nlab(g, "11.8\\ \\text{N}", COL.T, 36), l2 = nlab(g, "11.8\\ \\text{N}", COL.T, 36), lW = nlab(g, "19.6\\ \\text{N}", COL.W, 36), la = nlab(g, "3.92\\ \\text{m s}^{-2}", COL.A, 34);
   const E1 = solve(g, [
     { tex: "M = 3\\ \\text{kg},\\ m = 2\\ \\text{kg}", t: c("Take a three kilogram block"), size: 42 },
-    { tex: "a = \\dfrac{mg}{M + m} = \\dfrac{19.62}{5} = 3.92\\ \\text{m s}^{-2}", t: c("The acceleration is"), final: true, uly: 78, ulw: 620, ulColor: COL.A, size: 44, y: -240 },
+    { tex: "a = \\dfrac{mg}{M + m} = \\dfrac{19.62}{5} = 3.92\\ \\text{m s}^{-2}", t: c("The acceleration is"), final: true, uly: 88, ulw: 620, ulColor: COL.A, size: 44, y: -240 },
     { tex: "T = Ma = 3 \\times 3.92 = 11.8\\ \\text{N}", t: c("The tension is"), final: true, ulw: 520, ulColor: COL.T, size: 44, y: -100 },
     { tex: "mg - T = 19.6 - 11.8 = 7.85\\ \\text{N}", t: c("Check the hanging mass"), size: 42, y: 20 },
     { tex: "ma = 2 \\times 3.92 = 7.85\\ \\text{N}\\ \\checkmark", t: c("two times three point nine two is"), size: 42, y: 120 },
@@ -1019,9 +1024,9 @@ section("x6", (g, c, id) => {
     bM.at(bx, -65, 0, k); ML.at(bx, -65, k); bm.at(Pc[0] + 42, hy, 0, k); mL.at(Pc[0] + 42, hy, k);
     s1.draw(bx + 120, -66, Pc[0], -66, k); s2.draw(Pc[0] + 42, Pc[1] + 70, Pc[0] + 42, hy - 70, k);
     const tk = ap(t, c("The tension is"), 0.6), wk = ap(t, c("Check the hanging mass"), 0.6), ak = ap(t, cA + 0.8, 0.6);
-    T1.draw(bx + 120, -66, bx + 120 + 11.8 * 8, -66, { p: tk }); l1.at(bx + 120 + 11.8 * 4, -118, tk);
+    T1.draw(bx + 120, -66, bx + 120 + 11.8 * 8, -66, { p: tk }); l1.at(bx + 132, -112, tk, { anchor: "l" });
     T2.draw(Pc[0] + 42, hy - 70, Pc[0] + 42, hy - 70 - 11.8 * 8, { p: tk }); l2.at(Pc[0] + 100, hy - 70 - 11.8 * 5, tk, { anchor: "l" });
-    W2.draw(Pc[0] + 42, hy, Pc[0] + 42, hy + 19.6 * 8, { p: wk }); lW.at(Pc[0] + 100, hy + 19.6 * 6, wk, { anchor: "l" });
+    W2.draw(Pc[0] + 42, hy + 70, Pc[0] + 42, hy + 70 + 19.6 * 8, { p: wk }); lW.at(Pc[0] + 100, hy + 70 + 19.6 * 5, wk, { anchor: "l" });
     aA.draw(bx - 70, -190, bx + 70, -190, { p: ak, dash: "10 8" }); la.at(bx, -230, ak);
     E1(t);
   };
